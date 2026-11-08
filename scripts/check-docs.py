@@ -297,6 +297,15 @@ def self_test(root: Path) -> int:
             if src.is_dir():
                 shutil.copytree(src, tmp / item, dirs_exist_ok=True)
 
+        # sandbox 也要是 git 仓库 —— 门会用 `git check-ignore` 判「故意不跟踪的产物」，
+        # 不 init 的话 sandbox 与真实 checkout 行为不一致（自测就失去了意义）。
+        try:
+            subprocess.run(["git", "init", "-q"], cwd=str(tmp),
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                           check=False)
+        except (OSError, subprocess.SubprocessError):
+            pass
+
         readme = tmp / "README.md"
         accept = tmp / ACCEPT_DOC
         base = tmp / BASE_DOC
