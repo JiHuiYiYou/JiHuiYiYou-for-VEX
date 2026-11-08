@@ -24,6 +24,7 @@ CI 里两个都跑（`--self-test` 也进 CI），门本身坏掉时不会静悄
 import argparse
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -211,6 +212,22 @@ def check_acceptance_vs_baseline(docs: list[Doc], root: Path) -> list[str]:
 
 
 # ── 检查 4：裸路径 ────────────────────────────────────────────────────────
+def _is_ignored(root: Path, rel: str) -> bool:
+    """这个路径是不是**故意不进版本库**的产物？
+
+    用 `git check-ignore` 判定 —— `.gitignore` 就是「哪些是产物」的唯一真相源，
+    不在脚本里另抄一份（另抄一份 = 下一个漂移源）。
+    """
+    try:
+        r = subprocess.run(
+            ["git", "-C", str(root), "check-ignore", "-q", "--", rel],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
 def check_bare_paths(docs: list[Doc], root: Path) -> list[str]:
     problems = []
     seen = set()
@@ -223,6 +240,8 @@ def check_bare_paths(docs: list[Doc], root: Path) -> list[str]:
                 continue
             if (root / path).exists():
                 continue
+            if _is_ignored(root, path):
+                continue      # 故意不跟踪的构建产物（.gitignore 说了算）
             key = (str(doc.path), path)
             if key in seen:
                 continue
