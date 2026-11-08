@@ -162,7 +162,7 @@ Facts a reader should know, because they change what "vulnerable" means here.
 - **A measurement that contradicts the spec** → a normal issue. The
   [contribution guide](CONTRIBUTING.md) has the format that makes such a report actionable.
 - **A question about the VEX API or the plan** → a normal issue or a discussion.
-- **A known limitation you want to work on** → the "待测" list in
+- **A known limitation you want to work on** → the "to be measured" list in
   [`docs/00-事实基线.md` § 13](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) is the
   shortest path to doing something useful.
 - **A JHYY language question** → the

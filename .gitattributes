@@ -1,0 +1,34 @@
+# 强制 LF 行尾 —— 与编译器主仓 / IDE 仓一致
+#
+# ⚠️ Windows 上 git 默认会把 LF 换成 CRLF（"LF will be replaced by CRLF"），
+#    而 **CRLF 的 .sh 会让 bash 直接报错**（`#!/usr/bin/env bash\r` 找不到解释器）。
+#    这条坑主仓踩过（`feedback_edit_tool_crlf_trap`）。
+#
+# ⚠️ glob 规则要精确到扩展名，**别整目录套** —— 主仓那条 `qbe/** text eol=lf`
+#    曾把 `qbe/qbe.exe` 圈进"文本"做行尾转换 → 二进制损坏 → 发版被卡。
+#    所以下面逐个扩展名写，不写目录通配。
+*.md      text eol=lf
+*.sh      text eol=lf
+*.py      text eol=lf
+*.yml      text eol=lf
+*.yaml    text eol=lf
+*.c       text eol=lf
+*.h       text eol=lf
+*.mk      text eol=lf
+*.txt     text eol=lf
+*.json    text eol=lf
+*.svg     text eol=lf
+
+# 二进制：一律别碰行尾
+*.bin     binary
+*.elf     binary
+*.o       binary
+*.obj     binary
+*.a       binary
+*.lib     binary
+*.exe     binary
+*.dll     binary
+*.so      binary
+*.zip     binary
+*.7z      binary
+*.png     binary

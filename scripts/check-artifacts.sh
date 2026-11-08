@@ -36,7 +36,10 @@ EXPECT_SIZE=$(printf '%s' "$row" | grep -oE '[0-9]+ *B' | head -1 | tr -d ' B')
 
 echo "[check-artifacts] 事实基线期望: $EXPECT_SHA  ($EXPECT_SIZE B)"
 
-# ── 重建 ────────────────────────────────────────────────────────────────
+# ── 重建（**从干净状态**）────────────────────────────────────────────────
+# ⚠️ 陈旧的中间产物能让坏掉的构建脚本照样"绿" ⇒ 门必须先清干净再重建。
+#    （家族规约：改构建脚本后必须从干净状态重建，别拿陈旧产物当通过。）
+rm -rf "$REPO_DIR/$PROJ_DIR/build"
 "$REPO_DIR/scripts/build-vex.sh" "$PROJ_DIR" "$PROJ_NAME" >/dev/null
 
 BIN="$REPO_DIR/$PROJ_DIR/build/$PROJ_NAME.bin"

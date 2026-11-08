@@ -153,6 +153,7 @@ jhyy-for-vex/
 | [`docs/第0步-验收线.md`](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md) | 验收标准、拆解、门清单 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 怎么构建、跑哪些门、规矩 |
 | [`SECURITY.md`](SECURITY.md) | 再分发约束 —— **发布产物前先读** |
+| [`CHANGELOG.md`](CHANGELOG.md) | 改了什么 —— 本仓不发版，全部记在这里 |
 | [JHYY 编译器主仓](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler) | 语言、规范，以及本项目要对齐的 ABI |
 | [机会翼游官网](https://jihuiyiyou.github.io/JiHuiYiYou-website/vex/) | 家族网站 |
 

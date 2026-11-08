@@ -90,7 +90,8 @@ so nobody discovers it the expensive way.
 ## What Day 0 measured
 
 Everything below was measured on this machine (compile / disassemble / `readelf` / `nm`) —
-**zero JHYY variables**. Anything not measured is marked *待测*; no guesses are written down.
+**zero JHYY variables**. Anything not measured is marked as *to be measured*; no guesses are
+written down.
 
 - **The binary format needs no extra converter** — the SDK's `objcopy` emits the final format
   directly. The first 32 bytes are `XVX5` + version 1, and the entry point sits right behind
@@ -162,6 +163,7 @@ jhyy-for-vex/
 | [`docs/第0步-验收线.md`](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md) | Acceptance criteria, the step-by-step plan, and the gate list |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to build, which gates to run, and the rules |
 | [`SECURITY.md`](SECURITY.md) | Redistribution constraints — **read before shipping an artifact** |
+| [`CHANGELOG.md`](CHANGELOG.md) | What changed — this repository has no releases, so this file holds everything |
 | [JHYY compiler](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler) | The language, the spec, and the ABI this project targets |
 | [Project site](https://jihuiyiyou.github.io/JiHuiYiYou-website/vex/) | The family website |
 

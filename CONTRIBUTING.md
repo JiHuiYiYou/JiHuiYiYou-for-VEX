@@ -174,8 +174,8 @@ to be updated and `scripts/check-artifacts.sh` re-run.
   Every other document links to them instead of repeating them; restating a number is how
   it starts drifting.
 - **The acceptance line never gets ahead of the fact baseline.** Marking something
-  "✅ 已实测" requires the corresponding section in the fact baseline to exist *and* to have
-  content. The docs gate enforces this.
+  with the "✅ 已实测" (measured) marker requires the corresponding section in the fact
+  baseline to exist *and* to have content. The docs gate enforces this.
 - **Both READMEs change together** (`README.md` and `README.zh-CN.md`) — a facade that has
   forked is worse than one that is out of date.
 - **Docs-only changes still have to be fact-checked**: does the limitation still exist?

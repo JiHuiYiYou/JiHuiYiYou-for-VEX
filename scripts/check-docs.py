@@ -278,6 +278,27 @@ def check_github_yml(root: Path) -> tuple[list[str], bool]:
     return problems, True
 
 
+# ── 检查 6：两份 README 是同一份门面的两种语言 ────────────────────────────
+# 家族规约：**改一份就要改另一份** —— 门面分叉比内容旧更糟。
+# 这里查两件事：两份都在、且互相挂语言切换链接。
+def check_readme_pair(root: Path) -> list[str]:
+    problems = []
+    en = root / "README.md"
+    zh = root / "README.zh-CN.md"
+    if not en.exists():
+        problems.append("README.md 不存在（英文门面）")
+    if not zh.exists():
+        problems.append("README.zh-CN.md 不存在（中文门面）")
+        return problems
+    en_text = en.read_text(encoding="utf-8")
+    zh_text = zh.read_text(encoding="utf-8")
+    if "README.zh-CN.md" not in en_text:
+        problems.append("README.md 里没有指向 README.zh-CN.md 的语言切换链接")
+    if "README.md" not in zh_text:
+        problems.append("README.zh-CN.md 里没有指向 README.md 的语言切换链接")
+    return problems
+
+
 # ── 汇总 ──────────────────────────────────────────────────────────────────
 def check(root: Path) -> list[str]:
     docs = collect_docs(root)
@@ -286,6 +307,7 @@ def check(root: Path) -> list[str]:
     problems += check_section_refs(docs)
     problems += check_acceptance_vs_baseline(docs, root)
     problems += check_bare_paths(docs, root)
+    problems += check_readme_pair(root)
     yml_problems, checked = check_github_yml(root)
     problems += yml_problems
     # 去重（同一行引用同一节会被算两次）
@@ -406,6 +428,18 @@ def self_test(root: Path) -> int:
                     encoding="utf-8",
                 )
             probe("GitHub 模板 YAML 写坏", m_yml, lambda: check_github_yml(tmp)[0])
+
+        # ⑦ 两份 README 少了一份（门面分叉）
+        zh_readme = tmp / "README.zh-CN.md"
+
+        def m_pair(on):
+            if on:
+                if zh_readme.exists():
+                    zh_readme.unlink()
+            else:
+                if not zh_readme.exists():
+                    zh_readme.write_text("stub\n", encoding="utf-8")
+        probe("中文门面 README 丢了", m_pair, lambda: check_readme_pair(tmp))
 
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
