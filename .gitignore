@@ -1,4 +1,14 @@
 # 构建产物
+#
+# ⚠️ 这些**不提交是有意的**，不是忘了加。
+# `.bin` / ELF 里链了官方 SDK 的 `libv5rt.a` ⇒ 含 VEX 专有代码，
+# 在 docs/00-事实基线.md § 14「SDK 再分发」拍板前不能进公开 repo。
+#
+# 留存口径 = 本地留存 + 可复现脚本 + 一份哈希清单（事实基线 § 2.1）：
+#   scripts/build-vex.sh spike/day0-c day0c     # 重建全部五层
+#   对 docs/00-事实基线.md § 2.1 的 SHA256       # 确认是同一份
+#
+# 若将来要公开：只提交**自己产出的** .s / .o / .map 与哈希，.bin / ELF 不提交。
 build/
 *.elf
 *.bin
@@ -11,6 +21,10 @@ spike/day0-c/program.bin
 
 # 本机 agent 提示词（不入仓）
 CLAUDE.md
+
+# Python 缓存
+__pycache__/
+*.pyc
 
 # 编辑器 / 系统
 .vscode/

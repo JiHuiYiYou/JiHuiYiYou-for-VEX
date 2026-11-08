@@ -7,6 +7,11 @@
 # 例：
 #   scripts/build-vex.sh spike/day0-c day0c
 #
+# 项目名省略时取**工程目录名**（与 make 自己的默认 PROJECT 一致：
+#   PROJECT = $(notdir $(abspath $(CURDIR))) —— vex/mkenv.mk）
+# 早期版本这里取的是调用时的 $PWD，于是从仓库根目录调用会产出
+# build/<仓库根名>.bin 这种跟工程无关的名字。
+#
 # 环境变量：
 #   VEXCODE_HOME  VEXcode Pro V5 安装根目录（默认自动探测）
 #   VEX_SDK       SDK 目录（默认 $VEXCODE_HOME/sdk）
@@ -18,7 +23,7 @@
 set -euo pipefail
 
 PROJ_DIR="${1:?用法: build-vex.sh <工程目录> [项目名]}"
-PROJ_NAME="${2:-$(basename "$PWD")}"
+PROJ_NAME="${2:-$(basename "$PROJ_DIR")}"
 
 # ── 定位 VEXcode Pro V5 ────────────────────────────────────────────────
 if [ -z "${VEXCODE_HOME:-}" ]; then
@@ -45,7 +50,10 @@ BIN="build/$PROJ_NAME.bin"
 [ -f "$BIN" ] || { echo "[build-vex] 没产出 $BIN" >&2; exit 1; }
 
 # ── 校验产物格式（§ 3 的事实）────────────────────────────────────────
-head -c 4 "$BIN" | grep -q 'XVX5' || { echo "[build-vex] 头部魔数不是 XVX5" >&2; exit 1; }
+# 用 [ "$(head -c 4 ...)" = XVX5 ] 而不是 `head -c 4 | grep -q`：
+# grep -q 命中即退出会关掉管道写端，head 可能吃 SIGPIPE（141），
+# 在 set -o pipefail 下会把整条管道判成失败 ⇒ 误报"魔数不对"。
+[ "$(head -c 4 "$BIN")" = "XVX5" ] || { echo "[build-vex] 头部魔数不是 XVX5" >&2; exit 1; }
 
 SIZE=$(stat -c %s "$BIN")
 echo "[build-vex] OK  $BIN  ($SIZE B)   魔数 XVX5 ✔   入口 0x03800020（vexStartup）"
