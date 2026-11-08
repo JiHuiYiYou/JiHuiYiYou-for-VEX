@@ -1,0 +1,19 @@
+# 构建产物
+build/
+*.elf
+*.bin
+*.map
+*.o
+*.s
+
+# Day 0 探针的待烧录产物（可由 scripts/build-vex.sh 重新生成）
+spike/day0-c/program.bin
+
+# 本机 agent 提示词（不入仓）
+CLAUDE.md
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

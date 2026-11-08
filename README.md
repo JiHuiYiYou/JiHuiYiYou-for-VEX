@@ -1,4 +1,4 @@
-# jhyy-for-vex
+# JiHuiYiYou-for-VEX
 
 **让 [JHYY](https://github.com/JiHuiYiYou/JiHuiYiYou) 直接跑在 VEX V5 Brain 上。**
 
@@ -75,4 +75,3 @@ jhyy-for-vex/
 - VEX V5 SDK（随 VEXcode Pro V5 安装）：`…\VEXcode Pro V5\sdk\vexv5\`
 - [vexide](https://github.com/vexide/vexide) —— Rust 版 VEX V5 运行时，
   本项目的路线参照物（它的三段演化史在 `docs/第0步-验收线.md` 里有引用）。
-# JiHuiYiYou-for-VEX
