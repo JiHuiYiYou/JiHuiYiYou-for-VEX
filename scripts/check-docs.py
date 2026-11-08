@@ -28,6 +28,7 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from urllib.parse import unquote
 
 # ── 仓库里"裸路径"只认这几个前缀 ─────────────────────────────────────────
 REPO_PATH_PREFIXES = ("docs/", "scripts/", "spike/", ".github/")
@@ -138,7 +139,10 @@ def check_links(docs: list[Doc]) -> list[str]:
             if raw.startswith(("http://", "https://", "mailto:", "#")):
                 continue
             path_part, _, anchor = raw.partition("#")
-            path_part = path_part.replace("%20", " ")
+            # 中文文件名两种写法都得认：直接写 `docs/00-事实基线.md`，
+            # 或 percent-encode 成 `docs/00-%E4%BA%8B...md`（官网就是这么链的）。
+            path_part = unquote(path_part)
+            anchor = unquote(anchor)
             target = (doc.path.parent / path_part).resolve()
             if not target.exists():
                 problems.append(
@@ -233,7 +237,7 @@ def check_bare_paths(docs: list[Doc], root: Path) -> list[str]:
     seen = set()
     for doc in docs:
         for raw in BACKTICK_RE.findall(doc.text):
-            path = raw.strip().rstrip(".,;:)")
+            path = unquote(raw.strip().rstrip(".,;:)"))
             if not path.startswith(REPO_PATH_PREFIXES):
                 continue
             if " " in path or "*" in path or "…" in path:

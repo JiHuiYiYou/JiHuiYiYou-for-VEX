@@ -1,154 +1,180 @@
-# JiHuiYiYou-for-VEX
+<div align="center">
 
-**让 [JHYY](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler) 直接跑在 VEX V5 Brain 上。**
+<div><img src="assets/icon-animated.svg" width="96" alt="JHYY logo"></div>
 
-JHYY 是一门自研语言，有一个自举的编译器、一套自研后端（x86-64）。
-本项目给它加一个**嵌入式目标**：VEX V5 Brain（ARM，Xilinx Zynq / Cortex-A9）。
+<div><img src="assets/jhyy-calligraphy.png" width="220" alt="机会翼游 calligraphy logo"></div>
 
-[![Day 0](https://img.shields.io/badge/Day%200-%E5%B7%B2%E5%AE%8C%E6%88%90-00d4aa)](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md)
-[![规格书](https://img.shields.io/badge/%E8%A7%84%E6%A0%BC%E4%B9%A6-%E5%8D%95%E4%B8%80%E7%9C%9F%E7%9B%B8%E6%BA%90-blue)](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md)
-[![路线](https://img.shields.io/badge/%E8%B7%AF%E7%BA%BF-B%20%E7%9B%B4%E5%87%BA%20ARM%20%E6%9C%BA%E5%99%A8%E7%A0%81-lightgrey)](#%E8%B7%AF%E7%BA%BF)
-[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+### JHYY for VEX — An embedded target for the JHYY (机会翼游) systems programming language
+
+**Compile JHYY to the VEX V5 Brain. Measured, not guessed.**
+
+[![Day 0](https://img.shields.io/badge/Day%200-done-00d4aa)](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md)
+[![Spec](https://img.shields.io/badge/spec-single%20source%20of%20truth-blue)](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md)
+[![Route](https://img.shields.io/badge/route-B%20direct%20ARM%20machine%20code-lightgrey)](#route)
 [![CI](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/actions/workflows/ci.yml/badge.svg)](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![中文](https://img.shields.io/badge/lang-%E4%B8%AD%E6%96%87-red)](README.zh-CN.md)
 
-> **本仓是探索仓，产出是知识不是代码。**
-> 第 0 步的交付物是一份把 VEX 侧未知数**全部变成实测值**的规格书 ＋ 一份可逐层对拍的黄金参考。
-> 门清单见 [`docs/第0步-验收线.md`](docs/第0步-验收线.md) § 6；
-> 参与方式见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
+[Route](#route) · [Status](#status) · [What Day 0 measured](#what-day-0-measured) · [Gates](#gates) · [Layout](#layout) · [Docs](#docs) · [License](#license)
 
----
-
-## 路线
-
-**目标形态是 B：JHYY 直出 ARM 机器码**（不是"转译成 C++"）。
-
-但第 0 步先花几天做一件更基础的事：**把 VEX 侧的未知数全部变成实测值**，
-写成一份规格书 —— 它同时也是 B 阶段的黄金参考。
-
-```
-第 0 步（现在）  手写 C 探针 → 产物格式 / 启动链 / ABI / API 面 全部实测
-                 ├─ JHYY → C → clang → .bin          （A 路，黄金参考）
-                 └─ JHYY → ARM 机器码 → .bin          （B 路，目标）
-```
-
-### 路线 B 的边界：换掉的是 **clang**，不是 SDK
-
-"JHYY 直出 ARM 机器码"容易被读成"完全脱离 SDK"。**不是。**
-B 替换的是 **clang 的位置**，`ld` 及以下**原样不动**：
-
-```
-                ┌─ A 路：JHYY → C 源码 → clang ──┐
-JHYY 源码 ──────┤                              ├─→ arm-none-eabi-ld
-                └─ B 路：JHYY → ARM 机器码 (.o) ┘        │
-                                                             ├─ lscript.ld     官方 SDK
-                                                             ├─ stdlib_0.lib   官方 SDK
-                                                             ├─ libv5rt.a      官方 SDK
-                                                             └─ objcopy → .bin 官方 SDK
-```
-
-**B = JHYY 出 ARM `.o`，链官方 SDK 出 `.bin`。**
-
-这恰好就是 pros-rs 当年的**同构**（Rust 出 `.o`、链 libpros），
-区别是**你带着实测重走，不带它的沉没成本**。
-
-⇒ 推论也一致：**ABI 必须锁死**（softfp）、**入口必须锁死**（符号名 `main`）、
-**绑定面必须锁死**（每个 `extern fn` 逐字对应一个 C 符号）——
-链哪份库就认哪份 ABI，这三样锁不住，两路就没法对拍。
+</div>
 
 ---
 
-## 现在的状态
+## What it is
+
+**JHYY for VEX** gives [JHYY (机会翼游)](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler) — a
+self-hosted, statically typed, expression-oriented systems language — an **embedded target**:
+the VEX V5 Brain (ARM, Xilinx Zynq / Cortex-A9).
+
+The target machine is not the hard part. The hard part is that **everything about the VEX side
+starts out unknown**: the binary format, what the startup code does to you, which ABI the
+official SDK actually speaks, how its structs are laid out, and which functions are safe to
+call from another language.
+
+So **Step 0 turns those unknowns into measured values** and writes them down as a spec — which
+is then the golden reference for the real work.
+
+```
+Step 0 (now)  Hand-written C probe → binary format / startup chain / ABI / API surface, all measured
+               ├─ JHYY → C → clang → .bin          (route A, the golden reference)
+               └─ JHYY → ARM machine code → .bin    (route B, the goal)
+```
+
+## Route
+
+The goal is **route B: JHYY emits ARM machine code directly** — not "transpile to C++".
+
+**Route B replaces clang's slot. It does not replace the SDK.** Everything from `ld` down stays
+exactly as it is:
+
+```
+                ┌─ route A: JHYY → C source → clang ──┐
+JHYY source ────┤                                    ├─→ arm-none-eabi-ld
+                └─ route B: JHYY → ARM machine code ──┘      │
+                                                               ├─ lscript.ld      official SDK
+                                                               ├─ stdlib_0.lib    official SDK
+                                                               ├─ libv5rt.a       official SDK
+                                                               └─ objcopy → .bin  official SDK
+```
+
+**Route B = JHYY emits an ARM `.o`, the official SDK links it into a `.bin`.**
+
+That is structurally the same as what pros-rs did years ago (Rust emits `.o`, links libpros) —
+the difference is that this route is being re-walked **with measurements in hand**, without
+their sunk cost.
+
+⇒ The consequences are the same too: **the ABI must be locked** (softfp), **the entry symbol
+must be locked** (plain `main`), and **the binding surface must be locked** (every `extern fn`
+maps one-to-one onto a C symbol). Link a different library and you get a different ABI — leave
+any of the three unlocked and the two routes cannot be compared against each other.
+
+## Status
 
 | | |
 |---|---|
-| Day 0 | ✅ **已完成** —— 见 [`docs/00-事实基线.md`](docs/00-事实基线.md) |
-| Day 1–2 | ⬜ emitter 发 C（最小子集）+ 最小绑定面 |
-| Day 3 | ⬜ 对拍 + 规格书收口 |
-| B 阶段 | ⬜ JHYY 的 ARM 后端 |
+| Step 0 | ✅ **Done** — see [`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) |
+| Step 1–2 | ⬜ Emitter emits **C** (minimal subset) + the minimal binding surface |
+| Step 3 | ⬜ A/B comparison + spec freeze |
+| Route B | ⬜ JHYY's ARM backend |
 
-### Day 0 已经实测到的（摘要，详见事实基线）
+### The blocker nobody expects
 
-- **产物格式不需要额外转换器**：SDK 的 `objcopy` 直出最终格式；
-  头 32 字节 `XVX5` + 版本 1，入口钉在 `0x03800020`。
-- **启动链完全闭合**：清 `.bss` → stdlib 版本校验 → newlib impure data →
-  `__libc_init_array` → `vexMain` → `__libc_fini_array`。
-- **用户的 `main` 是一个 task**（`vexTaskAdd(main, 2, "MAIN")`），不是主线程。
-  ⇒ **B 路必须发射一个不带修饰的 `main` 符号**。
-- **ABI 锁定 softfp**（与 `libv5rt.a` 双向一致）。
-- **目标指令集是 ARM 态 4 字节定长** ⇒ 不必做 Thumb-2 变长编码。
-- **API 两层**：C++ `vex::`（1404 个 mangled 符号）与**纯 C `vex*()`**
-  —— 后者 JHYY 的 `extern fn` 直接绑，**零胶水层**。
-- **struct 布局实测**：packed 与非 packed 都有；C API 里**只有一个**按值传的 struct
-  （`V5_DeviceVisionRgb`，≤4 B ⇒ 寄存器传参）。
-- **JHYY 的硬约束**（ABI v4.0.0 § 6）：不支持变参、不支持 struct 按值跨 FFI；
-  且**指针宽度锁死 64 位** ⇒ ARM 目标要先定成 4 字节。
-- 内存预算：堆 1 MB / 栈 14 KB。
+JHYY's ABI v4.0.0 **locks pointer width at 64 bits**, and all four of its targets are amd64 —
+**there is no ARM target yet**. But `V5_DeviceT` is a **4-byte** C pointer.
 
----
+⇒ The ARM target has to settle pointer width at 32 bits **first**. Without that, not even an
+`extern fn` lines up. This is the first hard rock of route B; it is written down in the spec
+so nobody discovers it the expensive way.
 
-## 门
+## What Day 0 measured
 
-门清单只有一处：[`docs/第0步-验收线.md`](docs/第0步-验收线.md) **§ 6**。
+Everything below was measured on this machine (compile / disassemble / `readelf` / `nm`) —
+**zero JHYY variables**. Anything not measured is marked *待测*; no guesses are written down.
 
-| 门 | 在哪跑 | 管什么 |
+- **The binary format needs no extra converter** — the SDK's `objcopy` emits the final format
+  directly. The first 32 bytes are `XVX5` + version 1, and the entry point sits right behind
+  them at `0x03800020`.
+- **The startup chain is fully closed**: clear `.bss` → stdlib version check → newlib impure
+  data → `__libc_init_array` → `vexMain` → `__libc_fini_array`.
+- **Your `main` is a task, not the main thread** — the SDK registers it with
+  `vexTaskAdd(main, 2, "MAIN")`. ⇒ route B must emit a plain, unmangled `main` symbol.
+- **ABI locked to softfp** — our ELF and `libv5rt.a` both lack `Tag_ABI_VFP_args`.
+- **The target is ARM state, fixed 4-byte instructions** ⇒ no Thumb-2 variable-length encoding
+  needed in the backend.
+- **Two API layers**: C++ `vex::` (1404 mangled symbols, deliberately untouched) and the
+  **pure-C `vex*()`** — the latter binds straight to JHYY's `extern fn`, with **no glue layer**.
+- **Struct layouts measured**: both packed and unpacked exist. The whole pure-C API passes
+  exactly **one** struct by value (`V5_DeviceVisionRgb`, ≤4 B ⇒ passed in a register);
+  everything else goes by pointer.
+- **Memory budget**: 1 MB heap, 14 KB stack — recursion depth is a hard constraint.
+
+## Gates
+
+The gate list lives in exactly one place:
+[`docs/第0步-验收线.md` § 6](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md).
+
+| Gate | Where | What it checks |
 |---|---|---|
-| 文档门 | CI | 链接 / `§` 引用 / **验收线不许超前于事实基线** / 裸路径 |
-| 文档门自测 | CI | **证明那道门能红** |
-| Shell 门 | CI | `bash -n` + `shellcheck` |
-| 产物门 | **本地**（需 VEXcode Pro V5） | 重建黄金参考，核对事实基线 § 2.1 的哈希 / 大小 / 魔数 / 入口 |
+| Docs gate | CI | Links resolve · `§ N` references resolve · **the acceptance line never gets ahead of the fact baseline** · bare paths resolve |
+| Docs-gate self-test | CI | **Proves the gate can go red** — it breaks the docs on purpose and asserts every check fires |
+| Shell gate | CI | `bash -n` + `shellcheck` |
+| Artifact gate | **local** (needs VEXcode Pro V5) | Rebuilds the golden reference and checks it against the hash / size / magic / entry address recorded in the spec |
 
 ```bash
-python scripts/check-docs.py              # 文档门
-python scripts/check-docs.py --self-test  # 文档门自测
-scripts/check-artifacts.sh spike/day0-c day0c   # 产物门
+python scripts/check-docs.py              # docs gate
+python scripts/check-docs.py --self-test  # docs-gate self-test
+scripts/check-artifacts.sh spike/day0-c day0c   # artifact gate
 ```
 
----
+> The artifact gate is a **local** gate: GitHub's stock runners have no VEXcode Pro V5, and a
+> CI gate that is always green is worse than no gate at all.
 
-## 目录
+## Layout
 
 ```
 jhyy-for-vex/
 ├── docs/
-│   ├── 00-事实基线.md        # ★ 事实单一真相源（Day 0 实测）
-│   └── 第0步-验收线.md       # ★ 验收标准 + 拆解 + 🔒 写死条款 + 门清单
+│   ├── 00-事实基线.md        # ★ the single source of truth for measured facts
+│   └── 第0步-验收线.md       # ★ acceptance criteria, decomposition, gate list
 ├── scripts/
-│   ├── build-vex.sh          # 命令行构建 VEX 工程（不依赖 VEXcode GUI）
-│   ├── measure-abi.sh        # 量 struct 布局 / 传参约定
-│   ├── check-docs.py         # 文档门（含自测 --self-test）
-│   └── check-artifacts.sh    # 产物门（重建 + 核对事实基线的哈希清单）
+│   ├── build-vex.sh          # build a VEX project from the command line
+│   ├── measure-abi.sh        # measure struct layouts and calling conventions
+│   ├── check-docs.py         # docs gate (with --self-test)
+│   └── check-artifacts.sh    # artifact gate (rebuild + verify the hash list)
 ├── spike/
-│   ├── day0-c/               # Day 0 探针：手写 C，零 JHYY 变量
-│   │   ├── include/jhyy_vex.h # ★ JHYY 绑定面（逐字对应的 extern fn 清单）
-│   │   └── src/jhyy_vex.c     #   非变参屏显封装（变参只发生在 C 内部）
-│   └── day0-abi/             # ABI 测量探针（布局 + 寄存器约定）
+│   ├── day0-c/               # the Step 0 probe: hand-written C, zero JHYY variables
+│   │   ├── include/jhyy_vex.h # ★ the JHYY binding surface
+│   │   └── src/jhyy_vex.c     #   non-variadic display wrapper
+│   └── day0-abi/             # the ABI measurement probe
 ├── .github/
-│   ├── workflows/ci.yml      # CI 门
-│   ├── ISSUE_TEMPLATE/       # issue 模板
+│   ├── workflows/ci.yml
+│   ├── ISSUE_TEMPLATE/
 │   └── pull_request_template.md
-├── CONTRIBUTING.md · SECURITY.md · CODE_OF_CONDUCT.md · LICENSE
+└── CONTRIBUTING.md · SECURITY.md · CODE_OF_CONDUCT.md · LICENSE
 ```
 
----
+## Docs
 
-## 规矩
+| | |
+|---|---|
+| [`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) | The fact baseline — every measured number and platform fact lives here, and nowhere else |
+| [`docs/第0步-验收线.md`](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md) | Acceptance criteria, the step-by-step plan, and the gate list |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to build, which gates to run, and the rules |
+| [`SECURITY.md`](SECURITY.md) | Redistribution constraints — **read before shipping an artifact** |
+| [JHYY compiler](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler) | The language, the spec, and the ABI this project targets |
+| [Project site](https://jihuiyiyou.github.io/JiHuiYiYou-website/vex/) | The family website |
 
-1. **事实先写下来再动手** —— 平台事实一律进 `docs/00-事实基线.md`，别写进代码注释里。
-2. **第 0 步的产出是知识，不是代码** —— emitter 是探针，不许长成产品。
-   （这条在 [`第0步-验收线.md`](docs/第0步-验收线.md) § 3 里写死了。）
-3. **不直接改 JHYY 主仓** —— 本仓实验、拿到实测，再回主仓落地，单独评审。
-4. **产物本地留存，不进版本库** —— `.bin` / ELF 含 `libv5rt.a` 的代码（VEX 专有）；
-   在 [`00-事实基线.md`](docs/00-事实基线.md) § 14 拍板前不进公开 repo。
-   留存靠**本地 + 可复现脚本 + 哈希清单**（§ 2.1）。
-5. **验收线不许超前于事实基线** —— 勾 ✅ 之前先确认那个 § 里真有实测值。
-   文档门会盯这条。
+## License
 
----
+Source: **MIT** — see [LICENSE](LICENSE).
 
-## 参考
+⚠️ **The artifacts are a separate question.** A `.bin` or ELF produced here links the official
+VEX SDK's `libv5rt.a`, which contains **VEX-proprietary code** subject to a restrictive
+redistribution EULA. Until that is settled (see the spec's open questions), **do not publish
+the artifacts**. The SDK itself is **not** redistributed by this repository.
 
-- [JHYY 编译器主仓](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler) —— 语言规范 / 编译器 / 门
-- VEX V5 SDK（随 VEXcode Pro V5 安装）：`…\VEXcode Pro V5\sdk\vexv5\`
-  ⚠️ **SDK 不随本仓分发**（EULA，见 [`SECURITY.md`](SECURITY.md)）。
-- [vexide](https://github.com/vexide/vexide) —— Rust 版 VEX V5 运行时，
-  本项目的路线参照物（它的三段演化史在 `docs/第0步-验收线.md` 里有引用）。
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: facts first, the probe stays a probe,
+and the JHYY compiler repository is never edited from here — experiment here, land there.
