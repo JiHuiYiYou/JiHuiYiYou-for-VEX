@@ -43,6 +43,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: 安装 pyyaml
+        # 文档门要校验 .github/ 下的 YAML —— GitHub 自己不会告诉你模板写坏了，
+        # 它只是不显示那个模板。装不上就等于少了一道门。
+        run: pip install --quiet pyyaml
+
       - name: 文档门
         run: python scripts/check-docs.py
 

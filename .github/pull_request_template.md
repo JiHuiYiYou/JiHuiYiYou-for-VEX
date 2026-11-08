@@ -1,47 +1,50 @@
 <!--
-  一个 PR 一件事。描述里如果需要"并且"，那大概是两个 PR。
+  One PR does one thing. If the description needs an "and", it is probably two PRs.
 
-  完整规矩在 CONTRIBUTING.md —— 这个模板只问最容易忘的那几项。
+  The full rules live in CONTRIBUTING.md — this template only asks for the parts
+  that are easy to forget.
 -->
 
-### 这个 PR 改了什么
+### What this PR changes
 
 <!--
-  一两句。合进去之后有什么不一样？
-  如果是实测值：改的是事实基线的哪一节？
+  One or two sentences. What is different after this merges?
+  If it adds a measured value: which section of the fact baseline changed?
 -->
 
-### 为什么
+### Why
 
 <!--
-  问题，不是方案。如果是修 issue，写上编号（"Fixes #123"）。
-  如果是新增实测值：说明它回答了哪个"待测"。
+  The problem, not the solution. If this fixes an issue, say which one
+  ("Fixes #123").
+  If it adds a measurement: which "待测" (to be measured) entry does it close?
 -->
 
-### 怎么验的
+### How it was verified
 
 <!--
-  跑了哪些门、看到了什么。
-  **没跑的门就是没过的门** —— 所以没跑的也要写出来。
-  门清单在 docs/第0步-验收线.md § 6。
+  Which gates you ran, and what you saw. A gate that was not run is a gate that
+  did not pass — so name the ones you did not run, too.
+
+  The full gate list is in docs/第0步-验收线.md § 6.
 -->
 
-- [ ] 文档门（`python scripts/check-docs.py`）
-- [ ] 文档门自测（`python scripts/check-docs.py --self-test`）
-- [ ] Shell 门（`bash -n` + `shellcheck scripts/*.sh`）
-- [ ] 产物门（`scripts/check-artifacts.sh`）—— **需要 VEXcode Pro V5**，没跑请说明
+- [ ] Docs gate (`python scripts/check-docs.py`)
+- [ ] Docs-gate self-test (`python scripts/check-docs.py --self-test`)
+- [ ] Shell gate (`bash -n` + `shellcheck scripts/*.sh`)
+- [ ] Artifact gate (`scripts/check-artifacts.sh`) — **needs VEXcode Pro V5**; say so if you did not run it
 
-### 给评审者的话
+### Notes for the reviewer
 
 <!--
-  任何能加快评审的东西：你不确定的地方、做出的取舍、
-  刻意没碰的角落。
+  Anything that makes review faster: the parts you are unsure about, the
+  trade-offs you made, the corners you deliberately left alone.
 
-  如果动了绑定面（include/jhyy_vex.h 一类）或事实基线里的实测值，
-  请明确说 —— 那是最容易引起"验收线超前于事实基线"的地方，
-  评审者需要重点看。
+  If you changed the binding surface (include/jhyy_vex.h) or a measured value in
+  the fact baseline, say so explicitly — route A and route B both call those
+  symbols, and the reviewer needs to know before merging.
 -->
 
-- [ ] 改了**绑定面**（`extern fn` 的名字 / 签名）—— A 路与 B 路都要跟着改
-- [ ] 改了**事实基线里的实测值** —— 门会核对哈希清单
-- [ ] 只改了文档 / 脚本 / 模板
+- [ ] This changes the **binding surface** (an `extern fn` name or signature) — route A and route B both change
+- [ ] This changes a **measured value in the fact baseline** — the gate checks the hash list
+- [ ] This changes only documentation / scripts / templates

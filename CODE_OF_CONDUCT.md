@@ -1,9 +1,11 @@
 # Code of Conduct
 
-> **本仓的范围**：`JiHuiYiYou-for-VEX` 是 JHYY 的 **VEX 嵌入式目标探索仓** ——
-> 产出是**实测值与规格书**，不是产品代码（见 `docs/第0步-验收线.md` § 3.1）。
-> 贡献大概率是「补一条实测」「修一处文档漂移」「加一道门」这种粒度。
-> JHYY 语言本身的问题请去[编译器主仓](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler/discussions)。
+> **Scope of this repository.** `JiHuiYiYou-for-VEX` is the **VEX embedded-target probe** for
+> JHYY — its output is **measured values and a written spec**, not product code (see
+> `docs/第0步-验收线.md` § 3.1). Contributions are therefore likely to be "close one
+> measurement", "fix a documentation drift", or "add a gate". Questions about the JHYY
+> language itself belong in the
+> [compiler repository](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler/discussions).
 
 ## Our pledge
 

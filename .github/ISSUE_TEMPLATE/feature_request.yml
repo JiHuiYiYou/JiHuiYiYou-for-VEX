@@ -1,65 +1,67 @@
-name: 提议
-description: 想加一个实测项、一条门、一段文档，或者想改绑定面。
+name: Proposal
+description: A measurement to take, a gate to add, a document to fix, or a change to the binding surface.
 title: "[feat] "
 labels: ["enhancement"]
 body:
   - type: markdown
     attributes:
       value: |
-        本仓是**探针**不是产品（见 [`docs/第0步-验收线.md`](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/blob/main/docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md) § 3.1）。
-        所以提议请具体到"**要拿到哪个实测值**"，而不是"要实现哪个功能"。
+        This repository is a **probe**, not a product (see
+        [`docs/第0步-验收线.md`](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/blob/main/docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md)
+        § 3.1). So please be concrete about **which measured value you want to end up
+        holding** — not about which feature you want implemented.
 
   - type: textarea
     id: what
     attributes:
-      label: 要拿到什么
-      description: 一句话：这件事做完之后，我们会**知道**什么现在不知道的东西？
-      placeholder: 知道 `vexTasksRun` 的 tick 频率（规格书八项里唯一还缺的）。
+      label: What would we know afterwards
+      description: "One sentence: once this is done, what do we know that we do not know now?"
+      placeholder: The tick frequency of `vexTasksRun` — the last missing entry in the spec's eight items.
     validations:
       required: true
 
   - type: textarea
     id: why
     attributes:
-      label: 为什么现在做
+      label: Why now
       description: |
-        特别是：**为什么不能拖到 B 阶段**？
-        如果能拖，就别现在做 —— 第 0 步的产出是知识，不是代码。
+        In particular: **why can this not wait until route B?**
+        If it can wait, it should — Step 0's output is knowledge, not code.
     validations:
       required: true
 
   - type: dropdown
     id: layer
     attributes:
-      label: 落在哪一层
+      label: Which layer it lands in
       options:
-        - 事实基线（新实测值）
-        - 验收线（拆解 / 门）
-        - 脚本（scripts/）
-        - 探针（spike/）
-        - 绑定面（include/jhyy_vex.h 一类）
-        - GitHub 基建（CI / 模板 / 文档）
+        - Fact baseline (a new measured value)
+        - Acceptance line (decomposition / gates)
+        - Scripts (scripts/)
+        - Probe (spike/)
+        - Binding surface (include/jhyy_vex.h and friends)
+        - GitHub infrastructure (CI / templates / docs)
     validations:
       required: true
 
   - type: dropdown
     id: upstream
     attributes:
-      label: 要不要回主仓落地
+      label: Does it land in the compiler repository too
       description: |
-        本仓的规矩：**不在这里直接改 JHYY 主仓**（验收线 § 3.4）。
-        这里实测 → 回主仓落地 → 单独评审。
+        The rule here — **the JHYY compiler repository is never edited from this repo**
+        (acceptance line § 3.4). Experiment here, land there, review separately.
       options:
-        - 否 —— 纯本仓的事
-        - 是 —— 这里只做实验/实测，主仓的改动另开 PR
-        - 不确定
+        - No — entirely a repository-local thing
+        - Yes — experiment/measure here, land it in the compiler repo in a separate PR
+        - Not sure
     validations:
       required: true
 
   - type: textarea
     id: extra
     attributes:
-      label: 别的
-      description: 链接、参考、你觉得该由哪个门盯住。
+      label: Anything else
+      description: Links, references, or which gate you think should watch this.
     validations:
       required: false

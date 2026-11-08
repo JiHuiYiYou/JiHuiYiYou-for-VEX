@@ -1,61 +1,63 @@
-name: 报告一个不一致
-description: 文档说的和实测的对不上，或者脚本/探针跑不出该有的结果。
+name: Inconsistency report
+description: The docs say one thing and the machine says another — or a script/probe does not do what it should.
 title: "[bug] "
 labels: ["bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        这个仓的"bug"大多是**不一致**，不是崩溃。请带上**实测**来报 ——
-        本仓的价值全在实测值上（见 [`docs/00-事实基线.md`](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/blob/main/docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md)）。
+        Most "bugs" in this repository are **inconsistencies**, not crashes. Please bring
+        **measurements** — the whole value of this repository is in measured values (see
+        [`docs/00-事实基线.md`](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/blob/main/docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md)).
 
-        两条能省很多来回的规矩：
+        Two things that save a lot of back-and-forth:
 
-        * **先查事实基线的 § 13「待测」** —— 那里写着哪些还没在实机上确认过。
-          你测出来的结果如果能补上一条，那是本仓最想要的东西。
-        * **命令输出用 harness 或 Python `subprocess` 收**，别在 MSYS2 bash 里读 `$?`
-          —— bash 把退出码截成 8 位。
+        * **Check the "待测" (to be measured) list first** — § 13 of the fact baseline says
+          what has not been confirmed on real hardware yet. If your result closes one of
+          those, that is the most useful thing you can hand this repository.
+        * **Capture exit codes with a harness or Python `subprocess`**, not by reading `$?`
+          in MSYS2 bash — bash truncates exit codes to 8 bits.
 
   - type: dropdown
     id: kind
     attributes:
-      label: 不一致的类型
+      label: What kind of inconsistency
       options:
-        - 文档与实测不符（事实基线里的数字/结论错了）
-        - 构建脚本（scripts/*.sh）
-        - ABI 测量（scripts/measure-abi.sh）
-        - 探针行为（spike/）
-        - 文档内部矛盾 / 链接失效
-        - 其它
+        - Docs vs. reality (a number or a conclusion in the fact baseline is wrong)
+        - Build scripts (scripts/*.sh)
+        - ABI measurement (scripts/measure-abi.sh)
+        - Probe behaviour (spike/)
+        - Internal contradiction / broken link in the docs
+        - Other
     validations:
       required: true
 
   - type: textarea
     id: claimed
     attributes:
-      label: 文档说
-      description: 引用具体位置（§ 编号或文件:行号）+ 原文。
+      label: What the docs say
+      description: The exact location (§ number, or file:line) and the quoted text.
       placeholder: |
-        事实基线 § 8.1 写：「`V5_DeviceMotorPid` alignof = 1」
+        Fact baseline § 8.1 says: "`V5_DeviceMotorPid` alignof = 1"
     validations:
       required: true
 
   - type: textarea
     id: actual
     attributes:
-      label: 实测到什么
-      description: 命令 + 原始输出。别改写，直接贴。
+      label: What you measured
+      description: The command and its raw output. Do not paraphrase it.
       placeholder: |
         $ scripts/measure-abi.sh
         ...
     validations:
       required: true
 
-  - type: textarea
+  - type: input
     id: repro
     attributes:
-      label: 复现命令
-      description: 从仓库根目录能跑出上面那段输出的完整命令。
+      label: Reproduction command
+      description: The exact command, runnable from the repository root, that produced the output above.
       placeholder: scripts/measure-abi.sh
     validations:
       required: true
@@ -63,15 +65,15 @@ body:
   - type: textarea
     id: env
     attributes:
-      label: 环境
+      label: Environment
       description: |
-        三行就够：
-        * VEXcode Pro V5 版本（装在 `C:\Program Files (x86)\VEX Robotics\VEXcode Pro V5`）
+        Three lines is enough:
+        * VEXcode Pro V5 version (installed at `C:\Program Files (x86)\VEX Robotics\VEXcode Pro V5`)
         * `clang --version`
-        * 平台（Windows 版本 / MSYS2 版本）
+        * Platform (Windows version / MSYS2 version)
       placeholder: |
         VEXcode Pro V5: 5.4
-        clang 8.0.0 (VEX 工具链自带)
+        clang 8.0.0 (VEX toolchain)
         Windows 10 19045 + MSYS2
     validations:
       required: true
@@ -79,8 +81,8 @@ body:
   - type: textarea
     id: context
     attributes:
-      label: 别的
+      label: Anything else
       description: |
-        链接到相关的 issue / PR，或者你觉得该由哪个门来盯住这件事。
+        Links to related issues or PRs, or which gate you think should be watching this.
     validations:
       required: false

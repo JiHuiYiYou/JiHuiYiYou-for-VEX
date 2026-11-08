@@ -1,107 +1,195 @@
-# Contributing to JiHuiYiYou-for-VEX
+# Contributing to JHYY for VEX
 
-这个仓是 JHYY 的 **VEX 嵌入式目标探索仓**。产出是**实测值与规格书**，不是产品代码。
+Thanks for your interest in the VEX embedded target for [JHYY (机会翼游)](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler).
 
-三条比什么都重要的规矩，先看这三条：
+This repository is a **probe**, not a product: its output is a written spec of measured
+facts plus a golden reference, not a maintained backend. This guide covers how to run the
+gates, how to report something that does not match the spec, and how to get a pull request
+merged.
 
-1. **事实先写下来再动手** —— 平台事实一律进 `docs/00-事实基线.md`，别写进代码注释里。
-2. **第 0 步的产出是知识，不是代码** —— emitter 是探针，不许长成产品
-   （`docs/第0步-验收线.md` § 3.1）。
-3. **不直接改 JHYY 主仓** —— 本仓实验、拿到实测，回主仓落地，单独评审
-   （`docs/第0步-验收线.md` § 3.4）。
-
----
-
-## 门（gates）
-
-门清单只有一处：[`docs/第0步-验收线.md`](docs/第0步-验收线.md) **§ 6**。
-CI 里的每个步骤都对应其中一条；**没有门守着的清单 = 下一个漂移源**。
-
-### CI 门（stock runner 上真的能跑的）
-
-| 门 | 命令 | 管什么 |
-|---|---|---|
-| 文档门 | `python scripts/check-docs.py` | 链接能落地 · `§ N` 引用能落地 · **验收线不超前于事实基线** · 裸路径能落地 |
-| 文档门自测 | `python scripts/check-docs.py --self-test` | **证明上面那道门能红** —— 注入故障，断言每道检查都抓到了 |
-| Shell 门 | `bash -n scripts/*.sh` + `shellcheck -x scripts/*.sh` | 脚本语法与常见坑 |
-
-### 本地门（需要 VEXcode Pro V5 ⇒ CI 上跑不了）
-
-| 门 | 命令 | 管什么 |
-|---|---|---|
-| 产物门 | `scripts/check-artifacts.sh spike/day0-c day0c` | 重建黄金参考，核对**事实基线 § 2.1 里写的哈希 / 大小 / 入口 / 魔数** |
-
-> ⚠️ **产物门是本地门，别假装它每次 PR 都在跑。**
-> GitHub 的 stock runner 上没有 VEXcode Pro V5 ⇒ 一道永远绿的 CI 门比没有门更糟。
-> CI 里只留了一个**手动触发**的入口（`workflow_dispatch` + 自托管 runner 标签 `vexcode`）。
->
-> 哈希不在脚本里，而是**从事实基线 § 2.1 读出来** —— 避免第二份真相。
-> 改了产物 ⇒ 改事实基线 § 2.1 ⇒ 跑一遍产物门。
+- [Code of conduct](#code-of-conduct)
+- [I have a question](#i-have-a-question)
+- [Reporting an inconsistency](#reporting-an-inconsistency)
+- [Reporting a security vulnerability](#reporting-a-security-vulnerability)
+- [Suggesting a change](#suggesting-a-change)
+- [Development setup](#development-setup)
+- [The gates](#the-gates)
+- [Pull request process](#pull-request-process)
+- [Conventions](#conventions)
+- [License](#license)
 
 ---
 
-## 开发环境
+## Code of conduct
 
-| 需要 | 说明 |
+Be respectful. Assume good faith. Technical disagreement is not personal conflict.
+
+The full text — what that means in practice, and how to report a violation — is
+[`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
+
+## I have a question
+
+| Question | Where the answer lives |
 |---|---|
-| Windows 10 + MSYS2 bash | `C:\msys64\usr\bin\bash.exe` |
-| **VEXcode Pro V5** | 装在 `C:\Program Files (x86)\VEX Robotics\VEXcode Pro V5` —— 产物门与 ABI 测量都需要它 |
-| ARM binutils | `C:\msys64\ucrt64\bin\arm-none-eabi-{objdump,readelf,nm}.exe`（`pacman -S mingw-w64-ucrt-x86_64-arm-none-eabi-binutils`） |
-| Python 3 | 文档门用 |
+| What is actually known about the VEX side? | [`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) — the single source of truth for every number and platform fact |
+| What is the plan, and what is the acceptance line? | [`docs/第0步-验收线.md`](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md) |
+| How does JHYY's FFI / calling convention work? | [JHYY ABI v4.0.0](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler/blob/main/docs/abis/jhyy-abi-v4.0.0.md) |
+| How do I build, measure, and check? | [Development setup](#development-setup) and [The gates](#the-gates) |
+| Why is the probe structured this way? | [`docs/第0步-验收线.md` § 3](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md) — the "🔒" clauses |
 
-> ⚠️ **MSYS2 自带的 `objdump` 是 x86-only**，对 VEX 产物会报
-> `can't disassemble for architecture UNKNOWN!` ⇒ 反汇编必须用 `arm-none-eabi-objdump`。
+## Reporting an inconsistency
 
-### 常用命令
+Open an issue and include:
+
+1. **What the spec says** — the exact location (§ number, or file:line) and the quoted text.
+2. **What you measured** — the command and its raw output. Do not paraphrase it.
+3. **The command line** — the exact invocation that produced that output.
+4. **The environment** — VEXcode Pro V5 version, `clang --version`, and the platform.
+
+> [!TIP]
+> Capture command output with a harness or Python `subprocess` rather than by reading
+> `$?` in MSYS2 bash: bash truncates exit codes to 8 bits (`value & 0xFF`), so an
+> expected code ≥ 256 has to be reduced before you compare it (827 → 59, 501 → 245,
+> 300 → 44, 1000 → 232).
+
+> [!NOTE]
+> **A measurement is the currency here.** If you can close one of the "待测" (to be
+> measured) entries in the spec, that is the most useful report this repository can get.
+> The [issue template](.github/ISSUE_TEMPLATE/bug_report.yml) is built around that.
+
+## Reporting a security vulnerability
+
+**Do not open a public issue for it.** Use the private advisory form:
+
+**→ https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/security/advisories/new**
+
+What counts as a vulnerability here, what to include, and what happens afterwards are all
+in [`SECURITY.md`](SECURITY.md).
+
+## Suggesting a change
+
+Say what you would **know** afterwards, not what you would implement — this repository is
+a probe, and the spec is the deliverable.
+
+Three rules decide most proposals on their own:
+
+- **Facts first.** If the change adds a measured value, it goes into
+  [`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) with the
+  command that produced it. If it adds a plan, it goes into
+  [`docs/第0步-验收线.md`](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md).
+- **Do not grow the probe into a product.** A feature request that needs a general
+  emitter, a general ABI layer, or a general C binding is out of scope — see
+  [`docs/第0步-验收线.md` § 3.1](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md).
+- **Do not edit the compiler repository from here.** Experiment here, land there, review
+  separately — see
+  [`docs/第0步-验收线.md` § 3.4](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md).
+
+## Development setup
+
+**Host:** Windows 10 + MSYS2 bash (`C:\msys64\usr\bin\bash.exe`).
+
+| Needed | Why |
+|---|---|
+| **VEXcode Pro V5** | installed at `C:\Program Files (x86)\VEX Robotics\VEXcode Pro V5` — the artifact gate and the ABI measurement both need its toolchain |
+| ARM binutils | `C:\msys64\ucrt64\bin\arm-none-eabi-{objdump,readelf,nm}.exe` (`pacman -S mingw-w64-ucrt-x86_64-arm-none-eabi-binutils`) |
+| Python 3 | the docs gate |
+
+> [!IMPORTANT]
+> **MSYS2's own `objdump` is x86-only.** Pointing it at a VEX artifact gives
+> `can't disassemble for architecture UNKNOWN!` ⇒ use `arm-none-eabi-objdump`.
+> `readelf` works from either.
 
 ```bash
-# 构建黄金参考
+# 1. Build the golden reference
 scripts/build-vex.sh spike/day0-c day0c
 
-# 产物门（重建 + 核对事实基线 § 2.1）
+# 2. Artifact gate — rebuild and check it against the spec
 scripts/check-artifacts.sh spike/day0-c day0c
 
-# 量 struct 布局与传参约定
+# 3. Measure struct layouts and calling conventions
 scripts/measure-abi.sh
 
-# 文档门 + 自测
+# 4. Docs gate
 python scripts/check-docs.py
 python scripts/check-docs.py --self-test
 ```
 
----
+> [!NOTE]
+> The VEX SDK is **not** redistributed by this repository. Install it through VEX's own
+> channel — see [`SECURITY.md`](SECURITY.md).
 
-## 提 PR 的规矩
+## The gates
 
-- **一个 PR 一件事。** 描述里如果需要"并且"，那大概是两个 PR。
-- **改了实测值 ⇒ 事实基线 § 2.1 的哈希清单也要更新**，并跑一遍产物门。
-- **改了绑定面**（`extern fn` 的名字 / 签名）⇒ 说明 A 路与 B 路会怎么一起改 ——
-  绑定面是**两路共用的**，改一边就是改两边。
-- **验收线不许超前于事实基线** —— 文档门会盯这条。勾 ✅ 之前先确认那个 § 里真有内容。
-- 没跑的门**要在 PR 里写出来** —— 没跑的门就是没过的门。
+The gate list lives in exactly one place:
+[`docs/第0步-验收线.md` § 6](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md).
+Do not restate it elsewhere.
 
-## 报告不一致
+### CI gates — these really run on a stock runner
 
-见 [issue 模板](.github/ISSUE_TEMPLATE/bug_report.yml)。关键是**带上实测**：
-本仓的价值全在实测值上。
+| Gate | Command | What it checks |
+|---|---|---|
+| Docs gate | `python scripts/check-docs.py` | Links resolve · `§ N` references resolve · **the acceptance line never gets ahead of the fact baseline** · bare paths resolve · **the `.github/` YAML parses** |
+| Docs-gate self-test | `python scripts/check-docs.py --self-test` | Injects five kinds of breakage and asserts every check fires — **a gate that was never seen to fail is not a gate** |
+| Shell gate | `bash -n scripts/*.sh` + `shellcheck -x scripts/*.sh` | Script syntax and common traps |
 
-## 安全问题
+> [!NOTE]
+> The YAML check needs `pyyaml`. CI installs it; locally use
+> `C:\Users\liuzhen\miniconda3\python.exe` (the `python` on `PATH` is MSYS2's, which
+> has no `pip` and no `pyyaml`). Without it, the gate says it **skipped** the YAML check
+> rather than pretending it passed.
 
-**不要开公开 issue。** 见 [SECURITY.md](SECURITY.md)。
+### Local gates — CI cannot run these
 
-## 再分发（重要）
+| Gate | Command | What it checks |
+|---|---|---|
+| Artifact gate | `scripts/check-artifacts.sh spike/day0-c day0c` | Rebuilds the golden reference and checks it against the hash / size / magic / entry address recorded in the spec |
 
-本仓的**产物**（`.bin` / ELF）链了 VEX 官方 SDK 的 `libv5rt.a` ⇒ **含 VEX 专有代码**。
-官方 SDK 有 restrictive redistribution EULA。
+> [!IMPORTANT]
+> The artifact gate is a **local** gate: GitHub's stock runners have no VEXcode Pro V5.
+> A CI gate that is always green is worse than no gate at all. CI therefore only offers a
+> manual, self-hosted-runner entry point.
+>
+> The hash is **not** hardcoded in the script — it is read from the spec
+> (§ 2.1), so there is never a second copy to drift.
 
-⇒ 在 [`docs/00-事实基线.md`](docs/00-事实基线.md) § 14 拍板之前，
-**不要把产物传进公开 repo 或公开渠道**。
-本仓的源码是 MIT（见 [LICENSE](LICENSE)），但**源码与产物是两件事**。
+## Pull request process
 
-## 行为准则
+1. **One PR does one thing.** If the description needs an "and", it is probably two PRs.
+2. **Run the gates.** *A gate that wasn't run is a gate that didn't pass.* Say which ones
+   you ran — and which you did not.
+3. **Summarize the change in the commit message**, and add a `Co-Authored-By` trailer for
+   any AI assistant that contributed code.
+4. **Keep the facts in sync** — see [Conventions](#conventions).
 
-见 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。
+Changing the **binding surface** (`spike/day0-c/include/jhyy_vex.h`) costs more than it
+looks: route A and route B both call those symbols, so a rename or a signature change is a
+change to *both* routes. Say so explicitly in the PR description.
 
-## 许可
+Changing the **spec's measured values** costs the artifact gate: the hash list in § 2.1 has
+to be updated and `scripts/check-artifacts.sh` re-run.
 
-源码 MIT（[LICENSE](LICENSE)）。产物另议 —— 见上面「再分发」。
+## Conventions
+
+- **Numbers that change live in [`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md).**
+  Every other document links to them instead of repeating them; restating a number is how
+  it starts drifting.
+- **The acceptance line never gets ahead of the fact baseline.** Marking something
+  "✅ 已实测" requires the corresponding section in the fact baseline to exist *and* to have
+  content. The docs gate enforces this.
+- **Both READMEs change together** (`README.md` and `README.zh-CN.md`) — a facade that has
+  forked is worse than one that is out of date.
+- **Docs-only changes still have to be fact-checked**: does the limitation still exist?
+  Has the thing that fixed it shipped? A wrong document is worse than a stale one.
+- **Prose in the Chinese-language documents uses Simplified Chinese only.** The
+  repository-level documents (README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT) are in
+  English, matching the rest of the family; `docs/` and the Chinese README are in Chinese.
+- **Artifacts are never committed.** They contain the official SDK's `libv5rt.a`, which is
+  VEX-proprietary — see [`SECURITY.md`](SECURITY.md).
+
+## License
+
+Source: **MIT** — see [`LICENSE`](LICENSE).
+
+The **artifacts** are a separate question: they link the official VEX SDK's `libv5rt.a` and
+are therefore subject to VEX's redistribution EULA. Do not publish them before that is
+settled — see [`SECURITY.md`](SECURITY.md).

@@ -256,6 +256,28 @@ def check_bare_paths(docs: list[Doc], root: Path) -> list[str]:
     return problems
 
 
+# ── 检查 5：GitHub 的 YAML 能不能解析 ──────────────────────────────────────
+# ⚠️ **GitHub 自己不会告诉你 issue 模板写坏了** —— 它只是不显示那个模板。
+#    一行 `description: a: b` 就能让整份模板静默消失。
+def check_github_yml(root: Path) -> tuple[list[str], bool]:
+    """返回 (问题列表, 是否真的检查了)。缺 pyyaml 时不假装检查过。"""
+    files = sorted(root.glob(".github/workflows/*.yml")) + \
+            sorted(root.glob(".github/ISSUE_TEMPLATE/*.yml"))
+    if not files:
+        return [], True
+    try:
+        import yaml
+    except ImportError:
+        return [], False
+    problems = []
+    for f in files:
+        try:
+            yaml.safe_load(f.read_text(encoding="utf-8"))
+        except Exception as exc:
+            problems.append(f"{f.relative_to(root)}: YAML 解析失败 → {exc}")
+    return problems, True
+
+
 # ── 汇总 ──────────────────────────────────────────────────────────────────
 def check(root: Path) -> list[str]:
     docs = collect_docs(root)
@@ -264,6 +286,8 @@ def check(root: Path) -> list[str]:
     problems += check_section_refs(docs)
     problems += check_acceptance_vs_baseline(docs, root)
     problems += check_bare_paths(docs, root)
+    yml_problems, checked = check_github_yml(root)
+    problems += yml_problems
     # 去重（同一行引用同一节会被算两次）
     seen, uniq = set(), []
     for p in problems:
@@ -371,6 +395,18 @@ def self_test(root: Path) -> int:
             )
         probe("裸路径不存在", m_path, lambda: check_bare_paths(collect_docs(tmp), tmp))
 
+        # ⑥ GitHub 模板的 YAML 写坏（GitHub 自己只会静默不显示那个模板）
+        tpl = tmp / ".github" / "ISSUE_TEMPLATE" / "bug_report.yml"
+        if tpl.exists():
+            orig_tpl = tpl.read_text(encoding="utf-8")
+
+            def m_yml(on):
+                tpl.write_text(
+                    orig_tpl + ("\n  bad: description: a: b\n" if on else ""),
+                    encoding="utf-8",
+                )
+            probe("GitHub 模板 YAML 写坏", m_yml, lambda: check_github_yml(tmp)[0])
+
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -395,12 +431,18 @@ def main() -> int:
         return self_test(root)
 
     problems = check(root)
+    _, yml_checked = check_github_yml(root)
     if problems:
         print("❌ 文档门未通过：", file=sys.stderr)
         for p in problems:
             print(f"   • {p}", file=sys.stderr)
         return 1
     print("✔ 文档门通过：链接 / § 引用 / 验收线↔事实基线 / 裸路径")
+    if yml_checked:
+        print("✔ GitHub YAML 模板可解析")
+    else:
+        print("⚠ 跳过了 GitHub YAML 检查（缺 pyyaml）—— 用 "
+              "C:\\Users\\liuzhen\\miniconda3\\python.exe 跑，或 CI 里 pip install pyyaml")
     return 0
 
 

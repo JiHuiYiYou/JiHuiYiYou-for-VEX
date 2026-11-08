@@ -1,67 +1,169 @@
 # Security Policy
 
-`JiHuiYiYou-for-VEX` 是 JHYY 的 **VEX 嵌入式目标探索仓** —— 一个研究性质的技术探针，
-由一个人维护。
+**JHYY for VEX** is a research probe maintained by one person. It produces **no releases**
+and **no artifacts** — but it does produce `.bin` files that link proprietary VEX code, and
+that is the security-relevant fact this page is mostly about.
 
-这个仓的"安全"问题**不是常规意义上的漏洞**，而是三类具体的事：
+If you only want the short version:
 
-1. **产物里含 VEX 专有代码**（再分发风险）
-2. **构建脚本在本机跑**（装 SDK、跑 linker）
-3. **文档里的实测值被当成事实引用**（正确性风险）
+> **The artifacts contain VEX-proprietary code. Do not redistribute them.**
+> **Do not open a public issue for a suspected vulnerability** — use
+> [the private advisory form](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/security/advisories/new).
 
 ---
 
-## 1. 再分发风险 —— 最高优先级
+## 1. The redistribution problem — read this first
 
-本仓产出的 `.bin` / ELF **链了 VEX 官方 SDK 的 `libv5rt.a`**，
-里面是 **VEX 专有代码**。官方 SDK 有 restrictive redistribution EULA。
+A `.bin` or ELF produced by this repository links the official VEX SDK's `libv5rt.a`.
+That library contains **VEX-proprietary code**, and VEX's SDK carries a restrictive
+redistribution EULA.
 
-**如果你拿到本仓的产物并打算再分发（公开发布、上传、做成附件、打包给别人）：**
+**If you obtained an artifact from this repository and intend to redistribute it** — publish
+it, upload it, attach it to something, bundle it for someone else:
 
-> **先别发。** 先看 [`docs/00-事实基线.md`](docs/00-事实基线.md) § 14「SDK 再分发」，
-> 那里记录了当前的判断与待决点。
+> **Do not publish it yet.** The current position and the open question are recorded in
+> [`docs/00-事实基线.md` § 14](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md).
 
-本仓**自己的源码**是 MIT，可以自由用。**产物不是** —— 这是两件事。
+The **source** of this repository is MIT and freely reusable. The **artifacts** are not —
+those are two separate things.
 
-## 2. 不要开公开 issue
+This repository does **not** redistribute the VEX SDK. Install it through VEX's own channel.
 
-对于上面那类（EULA / 再分发）的问题：
+## 2. Reporting a vulnerability
 
-**不要开公开 issue。** 用
-[私有 advisory 表单](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/security/advisories/new)，
-或者直接邮件 **15901598712@163.com**。
+**Do not open a public issue for a suspected vulnerability.** Public issues are indexed,
+mirrored and cached within minutes — a public report can turn a fix into an exploit before a
+patch exists.
 
-公开 issue 会被索引、镜像、缓存 —— 报告本身可能先于修复扩散出去。
+Use GitHub's private advisory flow:
 
-## 3. 报告一个安全问题
+**→ https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/security/advisories/new**
 
-用[私有 advisory 表单](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/security/advisories/new)，
-或邮件 **15901598712@163.com**。请写清：
+It opens a thread visible only to you and the maintainer. If that form is unavailable to
+you, email the maintainer at **15901598712@163.com** with the same information and ask for a
+receipt confirmation.
 
-- 你做了什么
-- 为什么这是问题
-- 影响面（谁会受影响、影响什么）
-- 你建议怎么处理
+Please include:
 
-**会怎么处理：**确认收到 → 评估 → 修复或说明为什么不修 → 披露。
-没有承诺时限 —— 这是个单人维护的探索仓。
-
-## 4. 什么**不**算安全问题
-
-| 例子 | 去哪儿 |
+| Item | Why it matters |
 |---|---|
-| 文档里的实测值算错了 | 普通 issue（带实测）—— 那是**正确性**问题，不是安全问题 |
-| 构建脚本在你机器上跑不起来 | 普通 issue |
-| JHYY 语言本身的行为 | [编译器主仓](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler) |
-| VEX 固件/硬件的漏洞 | 找 VEX —— 跟我们无关 |
+| **What the spec says** — the § number and the quoted text | fixes land on the newest wording first |
+| **What you observed** — the raw command output, unedited | a one-line diff is the difference between a same-day fix and a week of questions |
+| **The command line** — the exact invocation | |
+| **The environment** — VEXcode Pro V5 version, `clang --version`, platform | the toolchain version changes what the flags mean |
+| **Impact** — what does an attacker gain, and what must they already have | it decides severity, and severity decides the deadline |
 
-## 5. 本仓跑的东西
+> [!TIP]
+> **Capture exit codes with a harness or Python `subprocess`, not by reading `$?` in MSYS2
+> bash.** Bash truncates exit codes to 8 bits (`value & 0xFF`), so an expected code ≥ 256 has
+> to be reduced before you compare it (827 → 59, 501 → 245, 300 → 44, 1000 → 232).
 
-`scripts/build-vex.sh` 会**调用本机装的 VEXcode Pro V5 工具链**（clang / ld / objcopy）
-和一个**你自己放进 `spike/` 的 SDK 目录**。
-它不下载任何东西、不联网、不写 SDK 目录以外的系统位置。
+> [!NOTE]
+> **You do not need to prove exploitability.** A source-level demonstration is enough.
 
-`scripts/measure-abi.sh` 只编译一个 `.c` 到临时目录，用完删掉。
+---
 
-> 装 SDK 本身请走 VEX 的官方渠道，别从本仓或任何镜像拿 ——
-> 本仓**不**分发 SDK。
+## 3. What counts as a vulnerability here
+
+### In scope
+
+- **Redistribution of the artifacts.** A `.bin` or ELF published somewhere it should not be,
+  or advice given to others that leads them to publish one. The artifacts embed VEX's
+  proprietary runtime; the EULA question is unresolved and open (see § 1).
+- **Supply-chain hazards introduced by this repository.** A script here that downloads
+  something, resolves a toolchain from an untrusted location, or executes bytes that were
+  not part of the checked-out source.
+- **The build scripts executing something the user did not intend.** `scripts/build-vex.sh`
+  drives the VEXcode Pro V5 toolchain; `scripts/check-artifacts.sh` runs it. A crafted
+  project directory that makes them do something outside their documented scope counts.
+- **A published hash or measurement that does not match reality**, in a way that would cause
+  someone to trust the wrong artifact.
+
+### Out of scope
+
+- **Documentation drift.** A wrong number, a stale claim, a broken link — that is a
+  **correctness** problem, not a security one. Report it as a normal issue; the
+  [contribution guide](CONTRIBUTING.md) has the format that makes such a report actionable.
+- **Build scripts that fail to run** on your machine. Normal issue.
+- **The JHYY language's own behaviour.** Report that in the
+  [compiler repository](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler).
+- **VEX firmware, hardware, or the official SDK's own vulnerabilities.** Report those to
+  VEX.
+- **Bugs in the tools this repository drives** (clang, `ld`, `objcopy`) beyond the bundling
+  itself.
+
+---
+
+## 4. Supported versions
+
+| Line | Supported |
+|---|---|
+| **The current `main`** | ✅ the only line that exists — there are no releases |
+| Anything older | ❌ — the spec is rewritten in place; there is no version history to support |
+
+This page deliberately names **no version numbers**: this repository has no releases, and the
+spec moves in place.
+
+---
+
+## 5. What happens after you report
+
+| Stage | Target |
+|---|---|
+| Acknowledgement that the report was received | 7 days |
+| Triage — is it a vulnerability, and how severe | 14 days |
+| Mitigation published, if one exists independently of a fix | immediately — you will not be asked to keep it quiet |
+| Fix landed for a critical or high severity report | as soon as it is green in CI — no fixed date, but nothing is deliberately held back |
+
+These are **targets, not guarantees** — this is a one-person project with a day job.
+If a report is not acknowledged inside the window, that is a defect in this process: say so
+in the same thread, and treat the silence as worth escalating.
+
+You will be told the triage outcome even when the answer is "not a vulnerability" — a
+reasoned "no" is a real answer, and it is more useful to you than silence.
+
+---
+
+## 6. Disclosure
+
+- **Give the maintainer a reasonable window to publish a fix before disclosing publicly.**
+  The default expectation is **90 days** from the first report. Ask for more time if a fix
+  needs it; an explicit extension is fine.
+- **If a mitigation exists before the fix does** — for example "do not redistribute the
+  artifact" — it is published in the advisory immediately.
+- **Credit** is offered in the advisory. Say so if you would rather stay anonymous.
+- **Already public?** If the issue is already described somewhere public, say so in the
+  report — it changes the disclosure timeline, not whether it gets fixed.
+
+---
+
+## 7. Security-relevant properties of this project
+
+Facts a reader should know, because they change what "vulnerable" means here.
+
+- **The artifacts embed VEX-proprietary code.** They are the reason this page exists. The
+  repository never commits them; it stores them locally and verifies them against a hash
+  list (see [`docs/00-事实基线.md` § 2.1](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md)).
+- **The VEX SDK is not vendored here.** The scripts expect it to be installed by VEX's own
+  installer, at the standard path.
+- **The scripts download nothing.** `scripts/build-vex.sh` drives a locally installed
+  toolchain; `scripts/measure-abi.sh` compiles one file into a temp directory and deletes
+  it; `scripts/check-docs.py` and `scripts/check-artifacts.sh` read the repository and the
+  local toolchain. None of them opens a socket.
+- **`scripts/check-artifacts.sh` executes the build**, which means it executes the toolchain
+  and links the SDK. Treat the SDK as part of your trust boundary, exactly like the build
+  itself.
+- **There is no telemetry and no credential handling** anywhere in this repository.
+
+---
+
+## 8. Reporting something that is not a vulnerability
+
+- **A measurement that contradicts the spec** → a normal issue. The
+  [contribution guide](CONTRIBUTING.md) has the format that makes such a report actionable.
+- **A question about the VEX API or the plan** → a normal issue or a discussion.
+- **A known limitation you want to work on** → the "待测" list in
+  [`docs/00-事实基线.md` § 13](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) is the
+  shortest path to doing something useful.
+- **A JHYY language question** → the
+  [compiler repository](https://github.com/JiHuiYiYou/JiHuiYiYou-compiler).
