@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: JHYY 语言本身的问题（不属于本仓）
+    url: https://github.com/JiHuiYiYou/JiHuiYiYou-compiler/discussions
+    about: 语言语义、编译器行为、ABI 规则 —— 那些在编译器主仓讨论，不是这里。
+  - name: 本仓的 Wiki
+    url: https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/wiki
+    about: 长文指南与 FAQ —— README 的补充，不是 issue。
+  - name: 本仓的规格书
+    url: https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/blob/main/docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md
+    about: 先看事实基线 —— 大部分"这是 bug 吗"的问题，那里已经有答案（或写着「待测」）。

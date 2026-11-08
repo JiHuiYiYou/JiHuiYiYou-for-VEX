@@ -11,9 +11,14 @@
  *   1. 取设备句柄（确认 C API 的 device 模型是 handle 不是端口号）
  *   2. 配设备 + 转电机（确认最小绑定面够不够用）
  *   3. Brain 屏显（确认 vexDisplay* 的行为）
+ *
+ * ⚠️ 屏显那一行走的是 jhyy_vex_display_puts（JHYY 绑定面的非变参封装），
+ *    不是直接调变参的 vexDisplayPrintf —— 理由见 include/jhyy_vex.h。
+ *    A 路与 B 路调的是同一个符号，这是两路能对拍的前提之一。
  */
 
 #include "v5.h"
+#include "jhyy_vex.h"
 
 /* C API 的 device 模型：V5_DeviceT = struct _V5_Device *（不透明指针）。
  * 索引 0 = PORT1。 */
@@ -33,8 +38,9 @@ int main(void)
     vexDelay(500);
     vexDeviceMotorVelocitySet(motor, 0);
 
-    /* Brain 屏幕 */
-    vexDisplayPrintf(1, 1, 0, "day0-c alive");
+    /* Brain 屏幕 —— 走 JHYY 绑定面的非变参封装，不直接调变参的 vexDisplayPrintf。
+     * A 路与 B 路调的是同一个符号 jhyy_vex_display_puts（见 include/jhyy_vex.h）。 */
+    jhyy_vex_display_puts(1, 1, "day0-c alive");
 
     /* 主循环必须带 wait/延时：main 是被 vexTaskAdd 注册进固件调度器的
      * 一个 task，不让出时间片会顶掉别的 task 的时间片。 */

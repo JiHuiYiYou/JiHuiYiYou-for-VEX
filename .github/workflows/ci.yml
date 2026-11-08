@@ -1,0 +1,93 @@
+name: jhyy-for-vex CI
+
+# 门清单见 [`docs/第0步-验收线.md`](../../docs/第0步-验收线.md) § 6。
+#
+# ⚠️ **本文件不自带门表**（学主仓 `JiHuiYiYou` 的做法）：
+#   一份没有门守着的清单 = 下一个漂移源。
+#   门表只有一处（验收线 § 6），CI 里的每个步骤都对应其中一条。
+#
+# ⚠️ **CI 门与本地门分开**：
+#   本文件里的门**必须**在 stock runner 上真的能跑。
+#   产物门需要 VEXcode Pro V5 ⇒ 它是**本地门**（`scripts/check-artifacts.sh`），
+#   CI 里只有一个**手动触发**的自托管 runner 入口 —— 不假装它每次 PR 都在跑。
+#   一个永远绿的 CI 门比没有门更糟。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      build:
+        description: "跑产物门（需要 VEXcode Pro V5 ⇒ 需要带 vexcode 标签的自托管 runner）"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docs:
+    name: 文档门（链接 / § 引用 / 验收线↔事实基线 / 裸路径）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: 文档门
+        run: python scripts/check-docs.py
+
+      - name: 文档门自测（证明这个门能红）
+        # 一个从没红过的门不是门 —— 自测故意把文档弄坏，断言每道检查都抓到了。
+        run: python scripts/check-docs.py --self-test
+
+  shell:
+    name: Shell 门（语法 + shellcheck）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 安装 shellcheck（版本钉死，与本地一致）
+        # 钉版本而不是 `apt-get install` —— 不同 runner 的发行版版本不一样，
+        # 同一个脚本在本地过了、在 CI 上红，是最耗人的那种错。
+        run: |
+          set -euo pipefail
+          SC_VER=v0.10.0
+          SC_URL="https://github.com/koalaman/shellcheck/releases/download/${SC_VER}/shellcheck-${SC_VER}.linux.x86_64.tar.xz"
+          curl -fsSL "$SC_URL" -o /tmp/sc.tar.xz
+          mkdir -p /tmp/sc && tar -xJf /tmp/sc.tar.xz -C /tmp/sc --strip-components=1
+          sudo install -m 0755 /tmp/sc/shellcheck /usr/local/bin/shellcheck
+          shellcheck --version
+
+      - name: bash -n 语法检查
+        run: |
+          for f in scripts/*.sh; do
+            echo "── $f"
+            bash -n "$f"
+          done
+
+      - name: shellcheck
+        run: shellcheck -x scripts/*.sh
+
+  build-selfhosted:
+    name: 产物门（自托管 runner，需 VEXcode Pro V5）
+    # 只在**手动触发**且显式勾选时跑 —— 没注册自托管 runner 时不会有排队作业。
+    if: github.event_name == 'workflow_dispatch' && inputs.build
+    runs-on: [self-hosted, windows, vexcode]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: 产物门（重建黄金参考，核对事实基线 § 2.1 的哈希）
+        shell: C:\msys64\usr\bin\bash.exe
+        run: scripts/check-artifacts.sh spike/day0-c day0c
