@@ -8,7 +8,7 @@
 
 **把 JHYY 编译到 VEX V5 Brain上。全靠实测，不靠猜。**
 
-[![第 0 步](https://img.shields.io/badge/%E7%AC%AC0%E6%AD%A5-%E5%B7%B2%E5%AE%8C%E6%88%90-00d4aa)](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md)
+[![第 0 步](https://img.shields.io/badge/%E7%AC%AC0%E6%AD%A5-%E8%A7%84%E6%A0%BC%E5%AE%8C%E6%88%90-00d4aa)](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md)
 [![规格书](https://img.shields.io/badge/%E8%A7%84%E6%A0%BC%E4%B9%A6-%E5%8D%95%E4%B8%80%E7%9C%9F%E7%9B%B8%E6%BA%90-blue)](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md)
 [![路线](https://img.shields.io/badge/%E8%B7%AF%E7%BA%BF-B%20%E7%9B%B4%E5%87%BA%20ARM%20%E6%9C%BA%E5%99%A8%E7%A0%81-lightgrey)](#%E8%B7%AF%E7%BA%BF)
 [![CI](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/actions/workflows/ci.yml/badge.svg)](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/actions/workflows/ci.yml)
@@ -68,7 +68,7 @@ JHYY 源码 ──────┤                              ├─→ arm-non
 
 | | |
 |---|---|
-| 第 0 步 | ✅ **已完成** —— 见 [`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) |
+| 第 0 步 | ✅ **规格书已完成** —— **八项全部实测**，最后一项在真 Brain 上测得（tick 频率 = **100 Hz**，2026-11-09）；屏显细节（`bOpaque` 语义、文字坐标单位）仍待测 —— 探针已备好：[`spike/day0-lab/`](spike/day0-lab) |
 | 第 1–2 步 | ⬜ emitter 发 **C**（最小子集）+ 最小绑定面 |
 | 第 3 步 | ⬜ 对拍 + 规格书收口 |
 | B 阶段 | ⬜ JHYY 的 ARM 后端 |
@@ -114,7 +114,8 @@ JHYY 的 ABI v4.0.0 把**指针宽度锁死 64 位**，四个目标全是 amd64 
 ```bash
 python scripts/check-docs.py              # 文档门
 python scripts/check-docs.py --self-test  # 文档门自测
-scripts/check-artifacts.sh spike/day0-c day0c   # 产物门
+scripts/check-artifacts.sh spike/day0-c day0c      # 产物门（黄金参考）
+scripts/check-artifacts.sh spike/day0-lab day0lab  # 产物门（实机探针）
 ```
 
 > 产物门是**本地门**：GitHub 的 stock runner 上没有 VEXcode Pro V5 ——
@@ -131,11 +132,15 @@ jhyy-for-vex/
 │   ├── build-vex.sh          # 命令行构建 VEX 工程（不依赖 VEXcode GUI）
 │   ├── measure-abi.sh        # 量 struct 布局 / 传参约定
 │   ├── check-docs.py         # 文档门（含自测 --self-test）
-│   └── check-artifacts.sh    # 产物门（重建 + 核对哈希清单）
+│   ├── check-artifacts.sh    # 产物门（重建 + 核对哈希清单）
+│   └── parse-lab-log.py      # 实机日志 → 规格书里的观测记录
 ├── spike/
 │   ├── day0-c/               # Day 0 探针：手写 C，零 JHYY 变量
 │   │   ├── include/jhyy_vex.h # ★ JHYY 绑定面（逐字对应的 extern fn 清单）
 │   │   └── src/jhyy_vex.c     #   非变参屏显封装（变参只发生在 C 内部）
+│   ├── day0-lab/             # 实机测量探针（把只能上硬件测的五件事一次测掉）
+│   │                          # —— 真正的 VEXcode 工程：GUI 里打开就能下载
+│   │                          # —— 结果由它自己写进 SD 卡
 │   └── day0-abi/             # ABI 测量探针（布局 + 寄存器约定）
 ├── .github/
 │   ├── workflows/ci.yml
@@ -169,4 +174,5 @@ jhyy-for-vex/
 ## 参与
 
 见 [CONTRIBUTING.md](CONTRIBUTING.md)。一句话版：事实先写下来、探针不许长成产品、
-**不在这里改 JHYY 主仓** —— 本仓实验、拿到实测，回主仓落地、单独评审。
+**不改 JHYY 主仓** —— 主仓只管语言，**VEX 这套目标支持由本仓自己养**
+（永久旁路：只读一份 pin 住的主仓、影子构建、不回灌。口径见验收线 § 3.4）。

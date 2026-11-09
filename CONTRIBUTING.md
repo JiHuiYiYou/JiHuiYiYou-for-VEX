@@ -80,8 +80,11 @@ Three rules decide most proposals on their own:
 - **Do not grow the probe into a product.** A feature request that needs a general
   emitter, a general ABI layer, or a general C binding is out of scope — see
   [`docs/第0步-验收线.md` § 3.1](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md).
-- **Do not edit the compiler repository from here.** Experiment here, land there, review
-  separately — see
+- **Do not edit the compiler repository from here.** The main repo keeps the language;
+  **this repo keeps the VEX target support** — a permanent bypass: the compiler is consumed
+  read-only, pinned to a commit, through a shadow build, and **nothing is pushed back**. The
+  spec records the pin, the upstream sync duty and the gate this repo owes its own bypassed
+  files — see
   [`docs/第0步-验收线.md` § 3.4](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md).
 
 ## Development setup

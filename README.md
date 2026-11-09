@@ -8,7 +8,7 @@
 
 **Compile JHYY to the VEX V5 Brain. Measured, not guessed.**
 
-[![Day 0](https://img.shields.io/badge/Day%200-done-00d4aa)](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md)
+[![Day 0](https://img.shields.io/badge/Day%200-spec%20done-00d4aa)](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md)
 [![Spec](https://img.shields.io/badge/spec-single%20source%20of%20truth-blue)](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md)
 [![Route](https://img.shields.io/badge/route-B%20direct%20ARM%20machine%20code-lightgrey)](#route)
 [![CI](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/actions/workflows/ci.yml/badge.svg)](https://github.com/JiHuiYiYou/JiHuiYiYou-for-VEX/actions/workflows/ci.yml)
@@ -73,7 +73,7 @@ any of the three unlocked and the two routes cannot be compared against each oth
 
 | | |
 |---|---|
-| Step 0 | ✅ **Done** — see [`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) |
+| Step 0 | ✅ **Spec done** — **all 8 spec items measured**, the last one on a real Brain on 2026-11-09 (tick frequency = **100 Hz**). The display details (`bOpaque`, the text coordinate unit) are still open — the probe is ready: [`spike/day0-lab/`](spike/day0-lab) |
 | Step 1–2 | ⬜ Emitter emits **C** (minimal subset) + the minimal binding surface |
 | Step 3 | ⬜ A/B comparison + spec freeze |
 | Route B | ⬜ JHYY's ARM backend |
@@ -125,7 +125,8 @@ The gate list lives in exactly one place:
 ```bash
 python scripts/check-docs.py              # docs gate
 python scripts/check-docs.py --self-test  # docs-gate self-test
-scripts/check-artifacts.sh spike/day0-c day0c   # artifact gate
+scripts/check-artifacts.sh spike/day0-c day0c      # artifact gate (golden reference)
+scripts/check-artifacts.sh spike/day0-lab day0lab  # artifact gate (on-robot probe)
 ```
 
 > The artifact gate is a **local** gate: GitHub's stock runners have no VEXcode Pro V5, and a
@@ -142,11 +143,15 @@ jhyy-for-vex/
 │   ├── build-vex.sh          # build a VEX project from the command line
 │   ├── measure-abi.sh        # measure struct layouts and calling conventions
 │   ├── check-docs.py         # docs gate (with --self-test)
-│   └── check-artifacts.sh    # artifact gate (rebuild + verify the hash list)
+│   ├── check-artifacts.sh    # artifact gate (rebuild + verify the hash list)
+│   └── parse-lab-log.py      # the on-robot log → the spec's observation record
 ├── spike/
 │   ├── day0-c/               # the Step 0 probe: hand-written C, zero JHYY variables
 │   │   ├── include/jhyy_vex.h # ★ the JHYY binding surface
 │   │   └── src/jhyy_vex.c     #   non-variadic display wrapper
+│   ├── day0-lab/             # the on-robot measurement probe (the five hardware gaps)
+│   │                          # — a real VEXcode project: open it in the GUI and Download
+│   │                          # — it logs its own results to the SD card
 │   └── day0-abi/             # the ABI measurement probe
 ├── .github/
 │   ├── workflows/ci.yml
@@ -179,4 +184,6 @@ the artifacts**. The SDK itself is **not** redistributed by this repository.
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: facts first, the probe stays a probe,
-and the JHYY compiler repository is never edited from here — experiment here, land there.
+and the JHYY compiler repository is never edited from here — the main repo keeps the language,
+**this repo keeps the VEX target support** (permanent bypass: a pinned, read-only copy of the
+compiler plus a shadow build, nothing pushed back). See § 3.4 of the acceptance line.

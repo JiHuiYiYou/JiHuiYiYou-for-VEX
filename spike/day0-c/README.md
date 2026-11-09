@@ -60,13 +60,16 @@ make T="C:/Program Files (x86)/VEX Robotics/VEXcode Pro V5/sdk" P=day0c
 
 ## 待测清单（勾掉就更新事实基线）
 
-- [ ] 电机真的转了 0.5 秒（PORT1）
-- [ ] Brain 屏显示 `day0-c alive`
-- [ ] `vexDisplayPrintf` 的 (x, y) 坐标语义（原点在哪？单位？）
-- [ ] 屏显的不透明语义（绑定面封装目前把 `bOpaque` 固定为 0）
-- [ ] `vexTasksRun` 的 tick 频率（消息泵频率 —— 规格书八项里唯一还缺的一条）
-- [ ] `.heap` 那 1 MB 在实机上是否真可用（`malloc` 试一下）
-- [ ] SD 卡直插 vs VEXcode Pro 下载按钮，哪条是竞赛里更顺手的
+> ✅ 下面这些**已经测完了**（2026-11-09 实机，见 [`../../docs/00-事实基线.md`](../../docs/00-事实基线.md) § 13.1）。
+> 本工程（`day0-c`）本身**没有烧过** —— 实机跑的是 `spike/day0-lab` 那个探针。
+
+- [x] 电机真的转了 —— ✅（探针实测 `Q1=moved`）
+- [x] Brain 屏能出字 —— ✅（`day0-lab` 的屏显相位全部出图）
+- [x] `vexDisplayPrintf` 的 (x, y) 坐标语义 —— ✅ **单位 = 像素**，原点左上，屏幕 **480×272**
+- [x] 屏显的不透明语义 —— ✅ **`bOpaque=0` 透 / `=1` 吃背景** ⇒ 绑定面改成 **`bOpaque=1`**
+- [x] `vexTasksRun` 的 tick 频率 —— ✅ **100 Hz**（`vexDelay(1)` 实耗 10 ms）
+- [x] `.heap` 那 1 MB 在实机上是否真可用 —— ✅ **整块可用**（`_sbrk` 分配+写回成功）；但**没有 `malloc`**
+- [ ] SD 卡直插 vs VEXcode Pro 下载按钮 —— ⏳ **仍未测**（那轮手边没有 microSD 卡）
 
 ## 拆开看
 

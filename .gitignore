@@ -16,8 +16,12 @@ build/
 *.o
 *.s
 
-# Day 0 探针的待烧录产物（可由 scripts/build-vex.sh 重新生成）
+# 探针的待烧录产物（可由 scripts/build-vex.sh 重新生成）
 spike/day0-c/program.bin
+spike/day0-lab/program.bin
+
+# VEXcode GUI 打开工程时生成的东西
+compile_commands.json
 
 # 本机 agent 提示词（不入仓）
 CLAUDE.md
