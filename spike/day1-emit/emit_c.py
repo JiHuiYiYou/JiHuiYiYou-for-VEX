@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import argparse
+import struct
 import sys
 from pathlib import Path
 
@@ -31,6 +32,28 @@ from astdump import Node, parse  # noqa: E402
 
 class EmitError(Exception):
     """最小子集不支持的东西 —— **记进规格书的问题清单**，不在这里绕过。"""
+
+
+# ⚠️ 主仓 `ast_dump.jhyy` 的 `ad_kv_hex64()` 有个**真 bug**：
+#    `nib >= 10` 时算的是 `87 + (nib - 10)`（'W'..'^'）而不是 `97 + ...`（'a'..'f'）
+#    ⇒ FLOAT 的位模式被打印成怪字符（'W' 'X' 'Y' 'Z' '[' '\' ']' '^'）。
+#    ⇒ 这里**解码回来**（不改主仓 —— 永久旁路），并把它记进事实基线。
+_HEX_DIGIT_FALLBACK = {
+    "W": "a", "X": "b", "Y": "c", "Z": "d",
+    "[": "e", "\\": "f", "]": "f", "^": "f",
+}
+
+
+def decode_broken_hex(text: str) -> int:
+    """把主仓那个坏掉的 hex 打印**还原**成 64 位整数。"""
+    s = text.strip()
+    if s.startswith("0x"):
+        s = s[2:]
+    fixed = "".join(_HEX_DIGIT_FALLBACK.get(ch, ch) for ch in s)
+    try:
+        return int(fixed, 16)
+    except ValueError as e:
+        raise EmitError(f"看不懂的 hex 位模式 {text!r}（{e}）") from e
 
 
 # ── 类型映射 ─────────────────────────────────────────────────────────────
@@ -58,6 +81,61 @@ WIDE = {"int64_t", "uint64_t", "double"}
 
 ENTRY_NAME = "main_jhyy"
 C_ENTRY = "main"
+
+
+_ESCAPES = {
+    "n": "\n", "t": "\t", "r": "\r", '"': '"', "\\": "\\", "0": "\0",
+    "b": "\b", "f": "\f", "v": "\v", "a": "\a",
+}
+
+
+def decode_dump_string(dumped: str) -> str:
+    """AST dump 里 `chars=` 的内容 → 字符串的**值**。
+
+    ⚠️ **dump 对字符串是有损的**（实测 2026-11-10）：
+    源里的 `"b\\\\b\\n"`（值 = b、\\、b、换行）在 dump 里变成 `b\\b\\n`
+    —— **反斜杠的转义被压掉了一个** ⇒
+    这里把 dump 文本**解码成值**，再由 `c_string_literal()` 按 C 重编码。
+    ⇒ 后果：值里若含 `\\` 且后面紧跟 `n/t/r/"/\\/0/b/f/v/a` 之一，**无法分辨**
+    （那是真转义还是"反斜杠+那个字符"）⇒ **含反斜杠的字符串在 C 路不可靠**
+    ⇒ 记进规格书的问题清单；语料里不放这种字符串。
+    """
+    s = dumped
+    if len(s) >= 2 and s.startswith('"') and s.endswith('"'):
+        s = s[1:-1]
+    out: list[str] = []
+    i = 0
+    while i < len(s):
+        ch = s[i]
+        if ch == "\\" and i + 1 < len(s) and s[i + 1] in _ESCAPES:
+            out.append(_ESCAPES[s[i + 1]])
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def c_string_literal(value: str) -> str:
+    """字符串的值 → C 的字符串字面量。"""
+    out = ['"']
+    for ch in value:
+        if ch == '"':
+            out.append('\\"')
+        elif ch == "\\":
+            out.append("\\\\")
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ord(ch) < 32 or ord(ch) == 127:
+            out.append(f"\\{ord(ch):03o}")
+        else:
+            out.append(ch)
+    out.append('"')
+    return "".join(out)
 
 
 class Emitter:
@@ -105,6 +183,13 @@ class Emitter:
             return PRIM_TO_C.get(prim, "int32_t")
         if k == "STRING":
             return "uint8_t *"
+        if k == "FLOAT":
+            return "double"
+        if k == "UNARY":
+            op = node.get("op") or "-"
+            if op == "!":
+                return "bool"
+            return self.infer_type(node.children[0])
         if k == "STRUCT_LIT":
             return node.get("type") or "int"
         if k == "CALL":
@@ -139,6 +224,21 @@ class Emitter:
             return self.c_type(node.children[1])
         raise EmitError(f"推不出 {k} 的类型")
 
+    def float_lit(self, node: Node) -> str:
+        """FLOAT 节点 → C 的浮点字面量。
+
+        ⚠️ 主仓的 hex 打印是坏的（见 `decode_broken_hex`）⇒ 这里还原位模式，
+        再用 Python 的 repr（**最短往返表示**）出十进制 ⇒ C 的 strtod 解析回来
+        一定是同一个位模式 ✓
+        """
+        prim = int(node.get("prim") or "9")
+        if prim != 9:
+            raise EmitError("f32 的位模式在 AST dump 里取不回来"
+                            "（dump 固定读 8 字节当 i64）⇒ 只支持 f64")
+        bits = decode_broken_hex(node.get("bits") or "0")
+        val = struct.unpack(">d", bits.to_bytes(8, "big"))[0]
+        return repr(val)
+
     # ── 表达式位置 ──────────────────────────────────────────────────────
     def expr(self, node: Node) -> str:
         k = node.kind
@@ -150,8 +250,24 @@ class Emitter:
         if k == "INT":
             return node.get("value") or "0"
         if k == "STRING":
-            # AST 里 chars 已经是带引号的 C 字符串字面量（源文本转义与 C 相同）
-            return node.get("chars") or '""'
+            # AST 的 chars 是**转义过的文本**，且 dump 有损（见 decode_dump_string）
+            return c_string_literal(decode_dump_string(node.get("chars") or '""'))
+        if k == "FLOAT":
+            return self.float_lit(node)
+        if k == "UNARY":
+            # 表达式位置的一元运算（类型位置的 `*` 走 c_type）
+            # ⚠️ C emitter 的 expr() 返回的是**字符串**
+            op = node.get("op") or "-"
+            inner = self.expr(node.children[0])
+            if op == "-":
+                return f"(-({inner}))"
+            if op == "!":
+                return f"(!({inner}))"
+            if op == "~":
+                return f"(~({inner}))"
+            if op == "*":
+                return f"(*({inner}))"
+            raise EmitError(f"暂不支持的一元运算 {op}")
         if k == "BINARY":
             op = node.get("op") or "+"
             return f"({self.expr(node.children[0])} {op} {self.expr(node.children[1])})"
@@ -159,7 +275,9 @@ class Emitter:
             op = node.get("op") or "-"
             return f"({op}{self.expr(node.children[0])})"
         if k == "CAST":
-            return f"(({self.c_type(node.children[1])}){self.expr(node.children[0])})"
+            # ⚠️ 类型**不能丢**：`200 as u8` 在 C 里写成 `200` 会溢出成别的值
+            tgt = self.c_type(node.children[1])
+            return f"(({tgt}){self.expr(node.children[0])})"
         if k == "CALL":
             name = node.children[0].get("name") or ""
             args = ", ".join(self.expr(a) for a in node.children[1:])
@@ -418,6 +536,27 @@ SELF_TEST_SRC2 = """MODULE @t2.jhyy:1:1 no_std=0 ndecls=1
 """
 
 
+SELF_TEST_SRC3 = """MODULE @t3.jhyy:1:1 no_std=0 ndecls=1
+  FUNC_DECL @t3.jhyy:1:1 name=main_jhyy nparams=0 extern=0 inline=0 naked=0
+    RET
+      IDENT @t3.jhyy:1:19 name=i32
+    BLOCK @t3.jhyy:1:1 nstmts=4
+      LET @t3.jhyy:2:5 mut=0 name=a
+        IDENT @t3.jhyy:2:16 name=i32
+        INT @t3.jhyy:2:22 value=5 prim=2
+      LET @t3.jhyy:3:5 mut=0 name=b
+        UNARY @t3.jhyy:3:16 op=-
+          IDENT @t3.jhyy:3:17 name=a
+      LET @t3.jhyy:4:5 mut=0 name=c
+        FLOAT @t3.jhyy:4:16 bits=0x3\\\\8000000000000 prim=9
+      LET @t3.jhyy:5:5 mut=0 name=s
+        CAST @t3.jhyy:5:15
+          STRING @t3.jhyy:5:15 chars="hi\\n" len=4
+          UNARY @t3.jhyy:5:26 op=*
+            IDENT @t3.jhyy:5:26 name=u8
+"""
+
+
 def self_test() -> int:
     """证明这个 emitter **能对** —— 断言的是**期望的 C 文本**，不是 observed 反推。"""
     c = Emitter(target="host").emit(parse(SELF_TEST_SRC))
@@ -479,6 +618,33 @@ def self_test() -> int:
     return 0
 
 
+def self_test_types() -> int:
+    """一元运算 / 浮点（坏 hex 解码）/ 字符串转义（dump 有损 ⇒ 解码再重编码）。"""
+    c = Emitter(target="host").emit(parse(SELF_TEST_SRC3))
+
+    expect = [
+        "(-(a))",                       # 一元负号
+        "double c = 1.5;",              # FLOAT：坏掉的 hex 还原出来的值
+        '"hi\\n"',                      # 字符串：解码成值再按 C 重编码
+        "char * s = ((char *)\"hi\\n\");",
+    ]
+    for e in expect:
+        assert e in c, f"C 里缺：{e!r}\n---- 实际 ----\n{c}"
+
+    # 坏 hex 的还原：'W'..'^' ⇒ 'a'..'f'
+    assert decode_broken_hex("0x3\\\\8000000000000") == 0x3FF8000000000000, \
+        hex(decode_broken_hex("0x3\\\\8000000000000"))
+
+    # 字符串：dump 的转义**有损** ⇒ 源里的 "b\\b\n"（值 = b、\、b、换行）
+    # 在 dump 里变成 "b\b\n" ⇒ 解码出来是 b、**退格**、换行 ⇒ 与真值不同
+    # ⇒ 这就是"含反斜杠的字符串不可靠"的实证（不是解码器的锅）
+    val = decode_dump_string('"b\\b\\n"')
+    assert val == "b\x08\n", repr(val)
+
+    print("✔ 自测通过：一元运算 / 浮点（坏 hex 解码）/ 字符串（解码+重编码）")
+    return 0
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="jhyy dump 的 AST → C 源码")
     ap.add_argument("dump", type=Path, nargs="?", help="dump 文本文件（- 表示 stdin）")
@@ -490,7 +656,7 @@ def main() -> int:
     args = ap.parse_args()
 
     if args.self_test:
-        return self_test()
+        return self_test() or self_test_types()
     if args.dump is None:
         ap.error("需要 dump 文件（或用 --self-test）")
 

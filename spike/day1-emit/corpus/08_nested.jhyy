@@ -1,0 +1,24 @@
+// 嵌套控制流 + 块作用域（if 分支里的 let）
+//
+// ⚠️ JHYY **不支持裸块** `{ ... }` 当语句（第一次写就撞到 parse error）
+//    ⇒ 块作用域要用 if/while 的分支来体现
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+fn main_jhyy() -> i32 {
+    let mut i: i32 = 0;
+    let mut acc: i32 = 0;
+    let f = "acc=%d\n" as *u8;
+    while i < 10 {
+        let x: i32 = i * 2;
+        if x > 8 {
+            acc = acc + x;
+        } else if x > 4 {
+            acc = acc + 1;
+        } else {
+            acc = acc - 1;
+        }
+        i = i + 1;
+    }
+    printf(f, acc);
+    return acc;
+}

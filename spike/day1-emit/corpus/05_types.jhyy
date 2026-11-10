@@ -1,0 +1,35 @@
+// 类型：i64 / u64 / f64 / u8 / i16 / 一元运算 / 位运算
+//
+// ⚠️ 两个坑：
+//  ① 每个 printf 一个 %d —— 格式串里 %d 的个数必须与实参个数**一致**
+//  ② **位运算只允许在 i32 上** —— 主仓编译器在 i64 上报 "type mismatch in binary"
+//     （第一次跑这道语料就是撞这个 ⇒ 语料自己的 bug，不是 emitter 的）
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+fn main_jhyy() -> i32 {
+    let a: i64 = 100;
+    let b: u64 = 7;
+    let c: f64 = 1.5 as f64;
+    let d: u8 = 200 as u8;
+    let e: i16 = -3 as i16;
+    let g: i32 = 100;
+    let f = "v=%d\n" as *u8;
+
+    printf(f, a as i32);
+    printf(f, b as i32);
+    printf(f, d as i32);
+    printf(f, e as i32);
+    printf(f, g >> 2);
+    printf(f, g & 255);
+    printf(f, g | 8);
+    printf(f, g ^ 3);
+    printf(f, (~g) as i32);
+    printf(f, (-a) as i32);
+    if c > 1.0 {
+        printf(f, 1);
+    }
+    if !(g > 50) {
+        printf(f, 2);
+    }
+    return a as i32;
+}

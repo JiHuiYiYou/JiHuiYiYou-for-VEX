@@ -1,0 +1,18 @@
+// 函数调用：多实参 / 嵌套调用 / 多层
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+fn add3(a: i32, b: i32, c: i32) -> i32 {
+    return a + b + c;
+}
+
+fn twice(x: i32) -> i32 {
+    return x * 2;
+}
+
+fn main_jhyy() -> i32 {
+    let f = "v=%d\n" as *u8;
+    printf(f, add3(1, 2, 3));
+    printf(f, twice(twice(5)));
+    printf(f, add3(twice(1), twice(2), twice(3)));
+    return add3(1, 2, 3);
+}

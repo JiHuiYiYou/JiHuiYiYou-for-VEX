@@ -1,0 +1,20 @@
+// 字符串：多个字面量 / 常见转义
+//
+// ⚠️ 两个坑（都是语料门抓出来的）：
+//  ① 每个 printf 一个 %d —— 格式串里 %d 的个数必须与实参个数**一致**
+//  ② ⚠️ **不要在字符串里放反斜杠**：AST dump 的字符串转义有损
+//     （源里的 "b\b\n" 在 dump 里变成 "b\b\n"）⇒ C 路不可靠
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+fn main_jhyy() -> i32 {
+    let f = "%d\n" as *u8;
+    let hello = "hello\n" as *u8;
+    let tab = "a\tb\n" as *u8;
+    let quote = "q\"q\n" as *u8;
+    printf(f, 1);
+    printf(f, 2);
+    printf(hello, 0);
+    printf(tab, 0);
+    printf(quote, 0);
+    return 0;
+}
