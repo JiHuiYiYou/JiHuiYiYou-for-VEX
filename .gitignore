@@ -15,6 +15,7 @@ build/
 *.map
 *.o
 *.s
+*.exe
 
 # 探针的待烧录产物（可由 scripts/build-vex.sh 重新生成）
 spike/day0-c/program.bin

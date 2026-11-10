@@ -74,7 +74,7 @@ any of the three unlocked and the two routes cannot be compared against each oth
 | | |
 |---|---|
 | Step 0 | ✅ **Spec done** — **all 8 spec items measured**, the last one on a real Brain on 2026-11-09 (tick frequency = **100 Hz**). The display details (`bOpaque`, the text coordinate unit) are still open — the probe is ready: [`spike/day0-lab/`](spike/day0-lab) |
-| Step 1–2 | ⬜ Emitter emits **C** (minimal subset) + the minimal binding surface |
+| Step 1–2 | 🔶 **Emitter emits C — first closed loop done** (2026-11-10): the same `hello.jhyy` compiled through the main repo's compiler and through this repo's emitter gives **byte-identical output and the same exit code**. Next: the VEX `.bin` and a real Brain run — [`spike/day1-emit/`](spike/day1-emit) |
 | Step 3 | ⬜ A/B comparison + spec freeze |
 | Route B | ⬜ JHYY's ARM backend |
 

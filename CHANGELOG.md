@@ -15,6 +15,12 @@
 The deliverable of Step 0 is a spec ([`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md))
 and a golden reference, not code.
 
+**Day 1–2 has started: the C emitter's first closed loop works.**
+`spike/day1-emit/` reads the main repo's `jhyy dump` (its AST tree, already machine-parseable)
+and emits C. The main repo is untouched — the bypass is real from the first commit. The same
+`hello.jhyy` compiled both ways — through the main repo's own compiler (the yardstick) and
+through the emitter — produces **byte-identical stdout and the same exit code**.
+
 **The repository's relationship to the language main repo is now fixed: permanent bypass.**
 The main repo keeps the language; this repo keeps the VEX target support. Nothing is pushed back
 into the main repo, and the main repo's working tree is never touched — the compiler is consumed

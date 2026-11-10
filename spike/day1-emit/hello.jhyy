@@ -1,0 +1,33 @@
+// hello.jhyy —— Day 1–2 的样例：最小子集每样都用一点
+//
+// 用途：给 C emitter 喂输入，并与主仓编译器（`jhyy run`）**行为对拍**。
+// 输出必须**确定性**（同样的输入 ⇒ 同样的 stdout ⇒ 才能逐字比）。
+
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+type P = struct { x: i32, y: i32 }
+
+fn add(a: i32, b: i32) -> i32 {
+    return a + b;
+}
+
+fn main_jhyy() -> i32 {
+    let mut i: i32 = 0;
+    let loop_fmt = "i=%d\n" as *u8;
+    let p = P { x: 3, y: 4 };
+    let sum = add(p.x, p.y);
+
+    while i < 3 {
+        printf(loop_fmt, i);
+        i = i + 1;
+    }
+
+    printf("sum=%d\n", sum);
+
+    if sum > 5 {
+        let big_fmt = "big=%d\n" as *u8;
+        printf(big_fmt, sum);
+    }
+
+    return sum;
+}
