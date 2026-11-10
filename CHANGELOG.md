@@ -42,6 +42,47 @@ shape (so comparing call *counts* is the wrong gate — compare the call *set* a
 and a 1-byte enum return leaves the top three bytes of `r0` undefined, so route B must mask
 them (the `and r0, r0, #0xff` is in the artifact).
 
+**Routes A and B now agree on behaviour on the PC — and that gate found two real bugs.**
+
+The static gates compare the *call set and order*, which cannot see logic errors. So route B
+(a bare-metal image) had **no behavioural verification at all** on the PC. It now does:
+`spike/vex-mock/arm_sim.py` is a **small interpreter** for the 18 instructions the emitter
+actually emits, so route B runs on the host too, and `spike/vex-mock/diff-ab.sh` compares
+route A (C + the C mock) against route B (the interpreter + a Python mirror of the mock) —
+**call trace line by line, screen text verbatim**. The two traces match (33 lines) and the
+screen text matches.
+
+That gate caught **two real bugs**, both of which would have wasted the lab trip:
+
+1. **Comparisons had their operands swapped.** The emitter put the *right* operand in `r0`
+   and the *left* one in `r1`, so `cmp r0, r1` computed `right - left` and every `<` / `>`
+   was inverted. On the robot, `v2 < 0` would have been evaluated as `v2 > 0`, so route B
+   would have printed `REVF SAME` while routes A and the C++ reference printed `REVF FLIP`.
+2. **The epilogue never restored the stack frame.** `ldm sp!, {r4-r11, pc}` reads the return
+   address *from `sp`*, so without `add sp, sp, #N` first, the return address came out of the
+   local-variable area — the program would have jumped to garbage and hung (a blank screen,
+   which looks exactly like "the program crashed").
+
+A third lesson: **the differential gate must compare the screen text, not just the trace.**
+Bug ① leaves the *trace* byte-identical (the same four display calls) and only changes the
+*words on the screen*.
+
+The interpreter is deliberately small and deliberately loud: an unknown instruction or an
+out-of-range access raises instead of being skipped, because a silently-skipped instruction
+would make the gate permanently green. It has its own self-test
+(`python spike/vex-mock/arm_sim.py --self-test`), wired into the CI gate.
+
+**The GUI flashing path is ready.** The three Step 3 projects now carry `.v5code` files —
+the same role `day0-lab.v5code` plays — so the lab trip is "double-click, Download, take a
+photo", exactly as last time. Measured against the installed VEXcode Pro V5: it **never
+overwrites** an existing project's `makefile` / `vex/mkenv.mk` / `vex/mkrules.mk` (the whole
+app bundle mentions `mkenv.mk` only three times: existence check, file-tree order, file-tree
+visibility), so route B's extra `.s` rule survives into the GUI build; the SDK version in the
+`.v5code` matches the installed one, so no "update old project" prompt appears; the project
+name does not affect the artifact's bytes; and even if the GUI auto-generates
+`robot-config.*`, the binary is unchanged (`--gc-section` drops the unreferenced empty
+`vexcodeInit`). See spec § 2.3.
+
 **Day 1–2 has started: the C emitter's first closed loop works.**
 `spike/day1-emit/` reads the main repo's `jhyy dump` (its AST tree, already machine-parseable)
 and emits C. The main repo is untouched — the bypass is real from the first commit. The same

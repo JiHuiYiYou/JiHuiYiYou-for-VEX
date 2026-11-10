@@ -242,7 +242,11 @@ class AsmEmitter:
             left = self.expr(node.children[0])
             right = self.expr(node.children[1])
             cond = _cond(op, unsigned)
-            out = left + self.push() + right + self.pop("r1")
+            # ⚠️ **寄存器顺序**：必须让 `cmp r0, r1` 算的是 **左 - 右**，
+            #    `_cond()` 的映射（`<`→lt / `>`→gt）才是对的。
+            #    评估顺序仍是「先左后右」（与 C 一致），所以右边算完要**搬**一下：
+            #      r0 = 左（从栈里弹出） / r1 = 右（刚算出来的）
+            out = left + self.push() + right + ["    mov r1, r0"] + self.pop("r0")
             out += [f"    cmp r0, r1",
                     "    mov r0, #0",
                     f"    mov{cond} r0, #1"]
@@ -363,7 +367,14 @@ class AsmEmitter:
         if k == "RETURN":
             if not node.children:
                 return ["    mov r0, #0"]
-            return self.expr(node.children[0]) + ["    ldm sp!, {r4-r11, pc}"]
+            # ⚠️ **提前返回也要把栈帧还回去**：`ldm sp!, {r4-r11, pc}` 是从
+            #    **sp** 读 r4..r11 与返回地址的 ⇒ sp 必须先回到序言压完
+            #    寄存器时的位置（= 入口 sp - 36）⇒ 先 `add sp, sp, #帧大小`。
+            #    帧大小这时**还不知道**（局部变量还在发）⇒ 用占位符，
+            #    `func()` 结尾统一替换。
+            return (self.expr(node.children[0])
+                    + ["    add sp, sp, #__FRAME__",
+                       "    ldm sp!, {r4-r11, pc}"])
         if k == "IF":
             cond = self.expr(node.children[0])
             lelse = self.new_label("else")
@@ -424,6 +435,8 @@ class AsmEmitter:
                 inner += self.stmt(s)
 
         frame = (self.frame + 7) // 8 * 8        # 8 字节对齐（AAPCS）
+        # 帧大小现在才确定 ⇒ 把 body 里的占位符换掉
+        inner = [line.replace("__FRAME__", str(frame)) for line in inner]
         out: list[str] = [f"    .global {cname}",
                           f"    .type {cname}, %function",
                           f"{cname}:",
@@ -432,7 +445,11 @@ class AsmEmitter:
         for i, (pname, off) in enumerate(param_slots):
             out.append(f"    str {ARG_REGS[i]}, [sp, #{off}]")
         out += inner
+        # ⚠️ **尾声必须先把栈帧还回去**：`ldm sp!, {r4-r11, pc}` 从 **sp** 读
+        #    r4..r11 与返回地址 ⇒ sp 得先回到 `push` 之后的位置（入口 sp - 36）。
+        #    少了这句 ⇒ 返回地址从**局部变量区**里读 ⇒ 跳到垃圾地址 ⇒ 跑飞。
         out += ["    mov r0, #0",
+                f"    add sp, sp, #{frame}",
                 "    ldm sp!, {r4-r11, pc}",
                 f"    .size {cname}, .-{cname}"]
         return out
@@ -571,10 +588,18 @@ def self_test() -> int:
         "    add r0, r0, r1",            # 加法
         "    cmp r0, #0",                # 比较
         "    beq ",                      # 条件跳转
+        "    add sp, sp, #",             # ★ 尾声**必须先还栈帧**（见下）
         "    ldm sp!, {r4-r11, pc}",     # 返回
     ]
     for e in expect:
         assert e in asm, f"汇编里缺：{e!r}\n---- 实际 ----\n{asm}"
+
+    # ★ 尾声必须**先还栈帧再 ldm**：`ldm sp!, {r4-r11, pc}` 是从 **sp** 读
+    #   返回地址的 ⇒ 少了 `add sp, sp, #帧大小` ⇒ 返回地址从**局部变量区**里读
+    #   ⇒ 跳到垃圾地址 ⇒ 跑飞（实测：真机上会直接挂掉）。
+    i_ldm = asm.rindex("ldm sp!, {r4-r11, pc}")
+    i_add = asm.rindex("add sp, sp, #")
+    assert i_add < i_ldm, "还栈帧的 `add sp` 必须排在 `ldm ... pc` 之前\n" + asm
 
     # 字符串常量进 .rodata
     assert "    .section .rodata" in asm, asm

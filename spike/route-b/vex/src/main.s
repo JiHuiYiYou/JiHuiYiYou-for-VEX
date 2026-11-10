@@ -31,8 +31,10 @@ main:
     bl vexDelay
     movw r0, #0
     movt r0, #0
+    add sp, sp, #8
     ldm sp!, {r4-r11, pc}
     mov r0, #0
+    add sp, sp, #8
     ldm sp!, {r4-r11, pc}
     .size main, .-main
     .section .rodata

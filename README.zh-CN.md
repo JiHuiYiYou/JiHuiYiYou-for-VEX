@@ -71,7 +71,7 @@ JHYY 源码 ──────┤                              ├─→ arm-non
 | 第 0 步 | ✅ **规格书已完成** —— **八项全部实测**，最后一项在真 Brain 上测得（tick 频率 = **100 Hz**，2026-11-09）；屏显细节（`bOpaque` 语义、文字坐标单位）仍待测 —— 探针已备好：[`spike/day0-lab/`](spike/day0-lab) |
 | 第 1–2 步 | 🔶 **emitter 发 C —— 第一个闭环已通**（2026-11-10）：同一个 `hello.jhyy`，主仓编译器那条路与本仓 emitter 那条路，**stdout 逐字相同 + 返回码相同**。下一步：VEX 的 `.bin` + 真机跑 —— [`spike/day1-emit/`](spike/day1-emit) |
 | B 路 | 🔶 **直出 ARM 机器码以探针形式走通**（2026-11-10）：[`spike/route-b/`](spike/route-b) 发的是 **ARM 汇编**而不是 C；三条路的绑定面 `.o` **逐字节相同** |
-| 第 3 步 | 🔶 **行为对照的三份产物都编好了**（2026-11-10）：**同一段逻辑**写成三份（JHYY→C ／ JHYY→机器码 ／ 手写 C++），静态核对全过 —— 绑定面 `.o` 三份**逐字节相同**、入口符号 `main` 不带修饰、B 路 ARM 态无 VFP、**A/B 调的函数集合与顺序相同** ⇒ **差一次上机**：[`spike/day3-cmp/`](spike/day3-cmp) |
+| 第 3 步 | 🔶 **行为对照的三份产物都编好了，而且 A/B 的行为已经在 PC 上对平**（2026-11-10）：**同一段逻辑**写成三份（JHYY→C ／ JHYY→机器码 ／ 手写 C++），静态核对全过 —— 绑定面 `.o` 三份**逐字节相同**、入口符号 `main` 不带修饰、B 路 ARM 态无 VFP、**A/B 调的函数集合与顺序相同**。又给 B 路写了个**小 ARM 解释器** ⇒ **A/B 的调用轨迹与屏显逐行比对** —— 这道门**抓出了两个真 bug**（比较操作数写反、尾声没还栈帧）⇒ **差一次上机**：[`spike/day3-cmp/`](spike/day3-cmp) |
 | B 阶段 | ⬜ JHYY 的 ARM 后端 |
 
 ### 绑定面只有一张表
@@ -158,6 +158,7 @@ jhyy-for-vex/
 │   ├── day1-emit/            # Day 1–2：A 路 emitter（AST → C）+ 对拍门 + 语料门
 │   ├── route-b/              # Day 1–2：B 路 emitter（AST → ARM 汇编）
 │   ├── day3-cmp/             # Day 3：同一段逻辑的三种写法 + 静态核对
+│   ├── vex-mock/             # VEX API 的 host mock + 小 ARM 解释器（B 路也能在 PC 上跑）
 │   └── day0-abi/             # ABI 测量探针（布局 + 寄存器约定）
 ├── .github/
 │   ├── workflows/ci.yml

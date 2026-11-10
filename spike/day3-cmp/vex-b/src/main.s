@@ -136,7 +136,8 @@ main:
     push {r0}
     movw r0, #20
     movt r0, #0
-    pop {r1}
+    mov r1, r0
+    pop {r0}
     cmp r0, r1
     mov r0, #0
     movgt r0, #1
@@ -147,7 +148,8 @@ main:
     movw r0, #20
     movt r0, #0
     rsb r0, r0, #0
-    pop {r1}
+    mov r1, r0
+    pop {r0}
     cmp r0, r1
     mov r0, #0
     movlt r0, #1
@@ -191,7 +193,8 @@ main:
     push {r0}
     movw r0, #1
     movt r0, #0
-    pop {r1}
+    mov r1, r0
+    pop {r0}
     cmp r0, r1
     mov r0, #0
     moveq r0, #1
@@ -201,7 +204,8 @@ main:
     push {r0}
     movw r0, #0
     movt r0, #0
-    pop {r1}
+    mov r1, r0
+    pop {r0}
     cmp r0, r1
     mov r0, #0
     moveq r0, #1
@@ -218,7 +222,8 @@ main:
     push {r0}
     movw r0, #1
     movt r0, #0
-    pop {r1}
+    mov r1, r0
+    pop {r0}
     cmp r0, r1
     mov r0, #0
     moveq r0, #1
@@ -265,7 +270,8 @@ main:
     push {r0}
     movw r0, #0
     movt r0, #0
-    pop {r1}
+    mov r1, r0
+    pop {r0}
     cmp r0, r1
     mov r0, #0
     movlt r0, #1
@@ -331,7 +337,8 @@ main:
     push {r0}
     movw r0, #0
     movt r0, #0
-    pop {r1}
+    mov r1, r0
+    pop {r0}
     cmp r0, r1
     mov r0, #0
     movne r0, #1
@@ -346,8 +353,10 @@ main:
 .L19_endwhile:
     movw r0, #0
     movt r0, #0
+    add sp, sp, #32
     ldm sp!, {r4-r11, pc}
     mov r0, #0
+    add sp, sp, #32
     ldm sp!, {r4-r11, pc}
     .size main, .-main
     .section .rodata

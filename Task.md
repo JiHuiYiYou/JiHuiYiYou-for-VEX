@@ -19,6 +19,10 @@
 - [ ] **找一个电机**（Smart Motor 就行）+ **把它插到 PORT1**
 - [ ] **给 Brain 和电机充电**（带电池去，或者实验室有电源）
 
+> ✅ **GUI 工程文件已经备好**（跟上次一样双击就能打开）：
+> `spike/day3-cmp/vex-a/cmp-a.v5code`、`vex-b/cmp-b.v5code`、`vex-cpp/cmp-cpp.v5code`
+> ⇒ 当天**不用**在 VEXcode 里"Open Folder"挑目录，直接双击这三个文件。
+
 ### 不用做
 
 - ❌ **不用买 microSD 卡** —— 探针有屏 + 串口两条通道，SD 写入这条可以无限期推迟
@@ -29,6 +33,11 @@
 
 - [ ] `bash spike/day3-cmp/build-all.sh` ⇒ 看到 `✔ 三份产物都编好了`
       （= 确认这一周的代码没把构建弄红；`lab-prep.sh` 里已经含这一步）
+- [ ] `bash spike/vex-mock/diff-ab.sh spike/day3-cmp/cmp.jhyy 2000`
+      ⇒ 看到 `✔ A 路与 B 路行为一致（PC 上已验证）`
+      （**A 路 vs B 路**的行为对拍：调用轨迹 + 屏显逐字相同。
+      这道门**已经替我们抓出两个真 bug** —— 比较写反、尾声没还栈帧 ⇒
+      不带上机就能发现。）
 
 ---
 
@@ -40,10 +49,10 @@
 |---|---|---|
 | 1 | Brain 用 USB 连电脑 | 1 分钟 |
 | 2 | **把电机插到 PORT1** | 1 分钟 |
-| 3 | VEXcode → 打开 `spike/day3-cmp/vex-a` → **Download** | 3 分钟 |
+| 3 | VEXcode → 打开 `spike/day3-cmp/vex-a/cmp-a.v5code` → **Download** | 3 分钟 |
 | 4 | 看屏，**拍一整屏**（四行都要在画面里） | 1 分钟 |
-| 5 | VEXcode → 打开 `spike/day3-cmp/vex-b` → **Download** → **拍一整屏** | 4 分钟 |
-| 6 | VEXcode → 打开 `spike/day3-cmp/vex-cpp` → **Download** → **拍一整屏** | 4 分钟 |
+| 5 | VEXcode → 打开 `spike/day3-cmp/vex-b/cmp-b.v5code` → **Download** → **拍一整屏** | 4 分钟 |
+| 6 | VEXcode → 打开 `spike/day3-cmp/vex-cpp/cmp-cpp.v5code` → **Download** → **拍一整屏** | 4 分钟 |
 | 7 | 眼睛确认电机**转了**（不用记） | — |
 
 > ⚠️ 三份程序跑完，屏上都是这**四行**：
@@ -100,6 +109,10 @@
 > ★ 为什么"验证"不用机器人：**host mock**（[spike/vex-mock](spike/vex-mock/)）让两个实现
 > 在 PC 上跑同一套假设备 ⇒ 比调用轨迹 ⇒ 语义等价。
 > 比的是**两个实现**，不是机器人的真实动力学 ⇒ mock 的植物模型刻意很粗就够。
+>
+> ★ **A 路与 B 路现在都能在 PC 上跑**（B 路靠一个小 ARM 解释器）⇒
+> **编译器的逻辑错误不用带上机**（实测已经这样抓出两个真 bug）。
+> 真机上只剩「**SDK 的真实行为**」没验 —— 比如反转标志到底翻不翻方向。
 >
 > ★ 为什么"路线 B"不用机器人：它的正确性靠**自举 byte-equal**（比任何真机测试都强）。
 > 而**真机唯一不可替代**的，是 B 路探针的**行为**—— 那就是下周这趟。

@@ -29,10 +29,39 @@ mock 只要 **① 确定 ② 两边一模一样** 就有意义 ⇒
 - 反转标志**翻转命令方向**（SDK 文档：inverts the motor commands）
 - 刹车模式 Brakes/Hold ⇒ 速度命令为 0 时直接停住
 
+## ★ A 路与 B 路都能在 PC 上跑（2026-11-10 新增）
+
+**原来**只有 A 路能跑（C mock）⇒ **B 路的逻辑没人验** ⇒ 实测果然藏了两个真 bug：
+
+| # | bug | 后果 |
+|---|---|---|
+| ① | 比较时**右操作数**放 `r0`、**左操作数**放 `r1` ⇒ `cmp` 算成"右 − 左" | `<` / `>` **全反** ⇒ `v2 < 0` 变成 `v2 > 0` ⇒ 真机上 `REVF FLIP` 打成 `REVF SAME` |
+| ② | 函数尾声**没还栈帧**（少 `add sp, sp, #N`） | 返回地址从**局部变量区**里读 ⇒ **跳到垃圾地址 ⇒ 跑飞** |
+
+⇒ 现在有 [`arm_sim.py`](arm_sim.py)：**emitter 产出的 ARM 汇编的小解释器**
+（只支持 emitter 会发的 **18 条指令**：push pop movw movt mov cmp ldr str add sub mul
+rsb and b beq bne bl ldm）
+⇒ **B 路也能在 PC 上跑** ⇒ **A/B 行为对拍**。
+
+```bash
+bash spike/vex-mock/diff-ab.sh spike/day3-cmp/cmp.jhyy 2000
+```
+
+⇒ 比两样：**调用轨迹**（逐行）+ **屏显文字** ⇒ 相同 ⇒ 两条路行为一致。
+
+> ⚠️ **必须比两样**：bug ① 只改了**判断结果** ⇒ **调用轨迹一模一样**
+> （还是那 4 次屏显调用），变的是**屏上的字** ⇒ 只比轨迹会漏掉它。
+>
+> ⚠️ 解释器**不认识就不认识**：遇到不认识的指令 / 越界访问一律**报错**，
+> 绝不静默跳过（否则就成了恒绿的假信号）。
+
 ## ★ 它**不能**替代真机
 
-**B 路（JHYY → ARM 机器码）的产物是裸机码** ⇒ host 上跑不了（qemu 也不行，没有固件）
-⇒ **只有 B 路的行为必须上机验**（见 [`docs/第1步-上机清单.md`](../../docs/%E7%AC%AC1%E6%AD%A5-%E4%B8%8A%E6%9C%BA%E6%B8%85%E5%8D%95.md)）。
+**B 路（JHYY → ARM 机器码）的产物是裸机码** ⇒ **真机上**跑不了（qemu 也不行，没有固件）
+⇒ **解释器验的是"逻辑对不对"，不是"真机行为对不对"**。
+
+⇒ 机器人上那份 `libv5rt.a` 的**真实行为**（比如反转标志到底翻不翻方向）
+仍然只能上机测 —— 但**编译器的逻辑错误**已经不用带上机了。
 
 mock 替代的是「**同一段逻辑的两种写法**」的等价性验证 ⇒ 那才是**大部分**验证量。
 
@@ -49,6 +78,10 @@ JHYY 程序**一个字都不用改**就能在 host 上跑。
 | `jhyy_vex.h` | host 侧的绑定面声明（原型与 SDK **逐字相同**） |
 | `vex_mock.c` / `.h` | mock 实现 + 轨迹/状态 API |
 | `runner.c` | host runner（生成的 C 的 `main` 用 `-Dmain=jhyy_main` 改名 ⇒ runner 提供真 `main`） |
+| [`arm_sim.py`](arm_sim.py) | **ARM 汇编的小解释器**（B 路） |
+| [`mock_model.py`](mock_model.py) | C 版 mock 的 **Python 镜像**（逐行对应 `vex_mock.c`） |
+| [`run-sim.sh`](run-sim.sh) | 跑 B 路（dump → 汇编 → 解释器） |
+| [`diff-ab.sh`](diff-ab.sh) | **A/B 行为对拍**（轨迹 + 屏显） |
 
 ## 用法
 
@@ -67,6 +100,14 @@ bash spike/vex-mock/selftest.sh
 - ① **确定性**：同一份源跑两遍 ⇒ 轨迹**逐字节相同**（不成立 ⇒ 差分测试在比噪声）
 - ② **敏感**：把速度 50 改成 40 ⇒ 轨迹**必须不同**（不成立 ⇒ mock 没在跑程序 ⇒ 恒绿假信号）
 - ③ **判读**：`cmp.jhyy` 的四行结论符合模型（`MOTOR MOVED` / `CONFIG OK` / `REVF FLIP` / `JHY CMP DONE`）
+- ④ **A 路 vs B 路行为对拍**：轨迹与屏显**逐字相同**
+- ⑤ **证明 ④ 能红**：把 B 路汇编改回旧的错误写法 ⇒ 对拍**必须报红**
+
+另有**解释器自己的自测**（CI 门，不需要主仓编译器）：
+
+```bash
+python spike/vex-mock/arm_sim.py --self-test
+```
 
 > ⚠️ 这道自测**需要主仓编译器**（`jhyy dump`）⇒ 是**本地门**，不是 CI 门。
 

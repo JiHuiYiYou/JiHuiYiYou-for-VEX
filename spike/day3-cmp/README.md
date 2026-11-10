@@ -59,7 +59,21 @@ bash spike/day3-cmp/build-all.sh
    - 三份的入口符号 `main` **不带修饰**（VEX 的 `vexMain` 用 `R_ARM_ABS32 main` 取它）
    - B 路是 **ARM 态**（4 字节定长）且**没有 VFP 指令** ⇒ softfp 天然满足
    - **A 路与 B 路调的是同一批函数、顺序相同**（见下面的「尾合并」）
-6. 打印三份产物的哈希与大小
+6. 打印三份产物的哈希与大小（与事实基线 § 2.1 对）
+
+## ★ 行为对拍：**A 路 vs B 路**，在 PC 上做
+
+静态门只比「**调用集合 + 顺序**」⇒ **看不见逻辑错误**。
+⇒ 给 B 路写了个**小 ARM 解释器** ⇒ B 路也能在 PC 上跑 ⇒ **比调用轨迹 + 屏显文字**：
+
+```bash
+bash spike/vex-mock/diff-ab.sh spike/day3-cmp/cmp.jhyy 2000
+```
+
+⇒ 现在 **33 条调用轨迹逐行相同**、屏显**逐字相同**。
+
+⚠️ 这道门**抓出了两个真 bug**（`<`/`>` 操作数写反、尾声没还栈帧）——
+详见事实基线 § 2.4 与 [`../vex-mock/README.md`](../vex-mock/README.md)。
 
 ### ⚠️ 「调用次数可以不同」—— clang 的尾合并
 
@@ -109,6 +123,22 @@ C 侧隐式转成 SDK 的 enum。序号表在绑定面表里（`ENUMS`）。
 且电机都应当转起来（`MOTOR MOVED`）。清单见
 [`docs/第1步-上机清单.md`](../../docs/%E7%AC%AC1%E6%AD%A5-%E4%B8%8A%E6%9C%BA%E6%B8%85%E5%8D%95.md)。
 
+## ★ 在 VEXcode GUI 里怎么烧（双击就行）
+
+| 工程 | 双击这个文件 |
+|---|---|
+| A 路 | [`vex-a/cmp-a.v5code`](vex-a/cmp-a.v5code) |
+| B 路 | [`vex-b/cmp-b.v5code`](vex-b/cmp-b.v5code) |
+| C++ 参考 | [`vex-cpp/cmp-cpp.v5code`](vex-cpp/cmp-cpp.v5code) |
+
+`.v5code` 是 VEXcode Pro 的**工程入口**（跟 `day0-lab.v5code` 同一个角色）⇒
+双击打开 → 点 **Download** ⇒ 烧进去的就是事实基线 § 2.1 里核对过哈希的那份
+`.bin`（实测依据见事实基线 § 2.3：GUI **不覆盖**工程的 makefile ⇒
+B 路那条 `.s` 规则照样生效；工程名不影响产物内容）。
+
+三个 `.v5code` 由 [`make-v5code.py`](make-v5code.py) **生成**
+（文件清单扫描磁盘 ⇒ 不会过期），`--check` 已经进了 `build-all.sh`。
+
 ## 文件
 
 | 文件 | 是什么 |
@@ -117,4 +147,5 @@ C 侧隐式转成 SDK 的 enum。序号表在绑定面表里（`ENUMS`）。
 | `vex-a/` | A 路 VEX 工程（`src/main.c` 是**生成的**） |
 | `vex-b/` | B 路 VEX 工程（`src/main.s` 是**生成的**；makefile 多一条 `.s` 规则） |
 | `vex-cpp/` | C++ 参考工程（`src/main.cpp` 是手写的） |
+| `make-v5code.py` | 生成三个 `.v5code`（GUI 入口）；`--check` = 只核对 |
 | `build-all.sh` | 编三份 + 静态核对 |

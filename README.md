@@ -76,7 +76,7 @@ any of the three unlocked and the two routes cannot be compared against each oth
 | Step 0 | ✅ **Spec done** — **all 8 spec items measured**, the last one on a real Brain on 2026-11-09 (tick frequency = **100 Hz**). The display details (`bOpaque`, the text coordinate unit) are still open — the probe is ready: [`spike/day0-lab/`](spike/day0-lab) |
 | Step 1–2 | 🔶 **Emitter emits C — first closed loop done** (2026-11-10): the same `hello.jhyy` compiled through the main repo's compiler and through this repo's emitter gives **byte-identical output and the same exit code**. Next: the VEX `.bin` and a real Brain run — [`spike/day1-emit/`](spike/day1-emit) |
 | Route B | 🔶 **Direct ARM machine code works as a probe** (2026-11-10): [`spike/route-b/`](spike/route-b) emits ARM assembly instead of C; the binding-surface object is **byte-identical across all three routes** |
-| Step 3 | 🔶 **All three comparison artifacts build** (2026-11-10): **the same logic** written three ways (JHYY→C / JHYY→machine code / hand-written C++), and every static check passes — the binding-surface object is **byte-identical across all three**, the entry symbol `main` is unmangled, route B is ARM-state with no VFP, and **routes A and B call the same functions in the same order**. Next: one lab trip — [`spike/day3-cmp/`](spike/day3-cmp) |
+| Step 3 | 🔶 **All three comparison artifacts build, and routes A and B now agree on behaviour** (2026-11-10): **the same logic** written three ways (JHYY→C / JHYY→machine code / hand-written C++). Static checks pass — the binding-surface object is **byte-identical across all three**, the entry symbol `main` is unmangled, route B is ARM-state with no VFP, and **routes A and B call the same functions in the same order**. A small **ARM interpreter** now runs route B on the PC too, so **A/B call traces and screen text are compared line by line** — that gate caught **two real compiler bugs** (inverted `<`/`>` operands, and an epilogue that never restored the stack frame). Next: one lab trip — [`spike/day3-cmp/`](spike/day3-cmp) |
 | Route B | ⬜ JHYY's ARM backend |
 
 ### The binding surface is one table
@@ -170,6 +170,7 @@ jhyy-for-vex/
 │   ├── day1-emit/            # Step 1–2: the route-A emitter (AST → C) + the gates
 │   ├── route-b/              # Step 1–2: the route-B emitter (AST → ARM assembly)
 │   ├── day3-cmp/             # Step 3: the same logic three ways + the static checks
+│   ├── vex-mock/             # host mock for the VEX API + a small ARM interpreter (route B on the PC)
 │   └── day0-abi/             # the ABI measurement probe
 ├── .github/
 │   ├── workflows/ci.yml
