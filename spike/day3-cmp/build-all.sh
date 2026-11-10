@@ -140,6 +140,26 @@ else
     fail=1
 fi
 
+# ⑤.5 ★ **ABI 门**：A 路与 B 路的 ELF 的 ARM 属性必须与 `libv5rt.a` 一致
+#      - softfp ⇒ **没有** Tag_ABI_VFP_args（实参走核心寄存器，不走 VFP）
+#      - enum 1 字节 ⇒ Tag_ABI_enum_size: small（实测 libv5rt.a 全部 33 个 obj 都是 small）
+READELF="/c/msys64/ucrt64/bin/arm-none-eabi-readelf.exe"
+for f in "$HERE/vex-a/build/cmp-a.elf" "$HERE/vex-b/build/cmp-b.elf"; do
+    base=$(basename "$f")
+    if "$READELF" -A "$f" | grep -q "Tag_ABI_VFP_args"; then
+        echo "❌ $base 带 Tag_ABI_VFP_args ⇒ 不是 softfp（与 libv5rt.a 不符）" >&2
+        fail=1
+    else
+        echo "✔ $base：softfp（没有 Tag_ABI_VFP_args）"
+    fi
+    if "$READELF" -A "$f" | grep -q "Tag_ABI_enum_size: small"; then
+        echo "✔ $base：enum 1 字节（与 libv5rt.a 一致）"
+    else
+        echo "❌ $base：enum 宽度不是 small ⇒ 与 libv5rt.a 不一致" >&2
+        fail=1
+    fi
+done
+
 # ── ⑥ 三份产物（哈希与事实基线 § 2.1 对）────────────────────────────────
 echo
 BASELINE="$REPO/docs/00-事实基线.md"
