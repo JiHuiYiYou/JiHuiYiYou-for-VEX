@@ -171,6 +171,7 @@ jhyy-for-vex/
 
 | | |
 |---|---|
+| [`Task.md`](Task.md) | ★ **下周的实验室清单**：之前 / 当天 / 之后，各做什么、要多久、看到什么算过 |
 | [`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md) | 事实基线 —— 所有实测数字与平台事实只写在这里，别处只引用不复述 |
 | [`docs/第0步-验收线.md`](docs/%E7%AC%AC0%E6%AD%A5-%E9%AA%8C%E6%94%B6%E7%BA%BF.md) | 验收标准、拆解、门清单 |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | 怎么构建、跑哪些门、规矩 |
