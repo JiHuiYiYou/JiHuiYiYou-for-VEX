@@ -27,6 +27,18 @@ program written in actual JHYY — compiles through the emitter into a V5 binary
 reference's**, so the JHYY route and the hand-written C route provably call the same symbol.
 The entry symbol is a plain, unmangled `main`, which is what VEX's `vexMain` looks up.
 
+**Everything that still needs hardware is now one trip:** `docs/第1步-上机清单.md`,
+and `scripts/lab-prep.sh` builds every artifact before you leave. The emitter also grew a
+**corpus** (`spike/day1-emit/corpus/`) so coverage is measurable rather than anecdotal — it
+already caught a bug in the test program itself, and the emitter now handles `else`,
+arrays and indexing (slices are refused on purpose: C has no slices, so the length would
+silently be lost).
+
+**The B-route plumbing works:** `scripts/overlay-build.sh` copies the pinned main-repo tree
+into a shadow directory, overlays this repo's `spike/overlay/*.jhyy`, and builds a working
+compiler there — the main repo's working tree is never touched. The ARM backend has
+somewhere to land now.
+
 **The repository's relationship to the language main repo is now fixed: permanent bypass.**
 The main repo keeps the language; this repo keeps the VEX target support. Nothing is pushed back
 into the main repo, and the main repo's working tree is never touched — the compiler is consumed

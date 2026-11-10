@@ -1,0 +1,18 @@
+// struct：定义 / 字面量 / 字段访问 / 传参 / 返回
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+type P = struct { x: i32, y: i32 }
+
+fn sum_of(p: P) -> i32 {
+    return p.x + p.y;
+}
+
+fn main_jhyy() -> i32 {
+    let a = P { x: 3, y: 4 };
+    let b = P { x: 10, y: 20 };
+    let f = "s=%d\n" as *u8;
+    printf(f, sum_of(a));
+    printf(f, sum_of(b));
+    printf(f, a.x + a.y);
+    return sum_of(a);
+}

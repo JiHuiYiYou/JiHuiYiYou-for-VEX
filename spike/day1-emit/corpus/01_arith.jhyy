@@ -1,0 +1,18 @@
+// 算术 / 比较 / 类型推导 / 显式类型
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+fn main_jhyy() -> i32 {
+    let a: i32 = 7;
+    let b = 3;                       // 类型推导
+    let sum = a + b;
+    let diff = a - b;
+    let prod = a * b;
+    let f = "sum=%d\n" as *u8;
+    printf(f, sum);
+    printf(f, diff);
+    printf(f, prod);
+    if a > b {
+        printf("gt\n" as *u8);
+    }
+    return sum + diff + prod;
+}

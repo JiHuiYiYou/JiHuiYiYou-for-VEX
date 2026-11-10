@@ -86,7 +86,16 @@ class Emitter:
         if k == "UNARY" and node.get("op") == "*":
             inner = self.c_type(node.children[0])
             return "char *" if inner == "uint8_t" else inner + " *"
+        if k == "ARRAY_TYPE":
+            elem, size = self.array_info(node)
+            return f"{elem}[{size}]"
         raise EmitError(f"类型位置不支持 {k}")
+
+    def array_info(self, node: Node) -> tuple[str, str]:
+        """ARRAY_TYPE → (元素类型, 长度表达式)。"""
+        elem = self.c_type(node.children[0])
+        size = self.expr(node.children[1]) if len(node.children) > 1 else ""
+        return elem, size
 
     # ── 类型推导（`let` 不写类型时用） ──────────────────────────────────
     def infer_type(self, node: Node) -> str:
@@ -155,6 +164,16 @@ class Emitter:
             name = node.children[0].get("name") or ""
             args = ", ".join(self.expr(a) for a in node.children[1:])
             return f"{name}({args})"
+        if k == "ARRAY_LIT":
+            # C 里没有"数组字面量"这个表达式 ⇒ 用初始化器的花括号（只在初始化位置合法）
+            items = ", ".join(self.expr(e) for e in node.children)
+            return "{" + items + "}"
+        if k == "INDEX":
+            return f"({self.expr(node.children[0])}[{self.expr(node.children[1])}])"
+        if k == "SLICE_RANGE":
+            # ⚠️ C 里没有切片 ⇒ 只给指针，**长度丢了** ⇒ 不能悄悄发出去
+            raise EmitError("SLICE_RANGE（切片）暂不支持：长度信息会丢，"
+                            "按验收线 § 3.1 记进问题清单，不在这里绕过")
         if k == "FIELD":
             # 字段访问：基对象在**子节点**上（那个 IDENT 带 `field=` 属性）
             return f"({self.expr(node.children[0])})"
@@ -180,8 +199,15 @@ class Emitter:
             name = node.get("name") or "_"
             kids = node.children
             if len(kids) == 2:
-                ctype = self.c_type(kids[0])
-                init = self.expr(kids[1])
+                tnode, init_node = kids
+                if tnode.kind == "ARRAY_TYPE":
+                    # ⚠️ C 的数组声明：名字要**插在**类型和长度之间
+                    #    （`int32_t arr[3]`，不是 `int32_t[3] arr`）
+                    elem, size = self.array_info(tnode)
+                    self.var_types[name] = f"{elem}[]"
+                    return [f"{pad}{elem} {name}[{size}] = {self.expr(init_node)};"]
+                ctype = self.c_type(tnode)
+                init = self.expr(init_node)
             elif len(kids) == 1:
                 ctype = self.infer_type(kids[0])
                 init = self.expr(kids[0])
@@ -199,9 +225,15 @@ class Emitter:
             return [f"{pad}{self.expr(node.children[0])} = {self.expr(node.children[1])};"]
         if k == "IF":
             cond = self.expr(node.children[0])
+            blocks = node.children[1:]
             out = [f"{pad}if ({cond}) {{"]
-            out += self.body(node.children[1:], ind + 1)
+            out += self.body(blocks[:1], ind + 1)
             out.append(pad + "}")
+            if len(blocks) > 1:
+                # 第二个 BLOCK = else 分支
+                out.append(pad + "else {")
+                out += self.body(blocks[1:2], ind + 1)
+                out.append(pad + "}")
             return out
         if k == "WHILE":
             cond = self.expr(node.children[0])
@@ -354,6 +386,38 @@ SELF_TEST_SRC = """MODULE @t.jhyy:1:1 no_std=0 ndecls=3
 """
 
 
+SELF_TEST_SRC2 = """MODULE @t2.jhyy:1:1 no_std=0 ndecls=1
+  FUNC_DECL @t2.jhyy:1:1 name=main_jhyy nparams=0 extern=0 inline=0 naked=0
+    RET
+      IDENT @t2.jhyy:1:19 name=i32
+    BLOCK @t2.jhyy:1:1 nstmts=3
+      LET @t2.jhyy:2:5 mut=0 name=arr
+        ARRAY_TYPE @t2.jhyy:2:18
+          IDENT @t2.jhyy:2:19 name=i32
+          INT @t2.jhyy:2:18 value=3 prim=2
+        ARRAY_LIT @t2.jhyy:2:29 nelems=3
+          INT @t2.jhyy:2:30 value=1 prim=2
+          INT @t2.jhyy:2:33 value=2 prim=2
+          INT @t2.jhyy:2:36 value=3 prim=2
+      IF @t2.jhyy:3:5
+        IDENT @t2.jhyy:3:8 name=arr
+        BLOCK @t2.jhyy:3:5 nstmts=1
+          EXPR_STMT @t2.jhyy:4:9
+            ASSIGN @t2.jhyy:4:9
+              INDEX @t2.jhyy:4:9
+                IDENT @t2.jhyy:4:9 name=arr
+                INT @t2.jhyy:4:13 value=0 prim=2
+              INT @t2.jhyy:4:18 value=9 prim=2
+        BLOCK @t2.jhyy:3:5 nstmts=1
+          EXPR_STMT @t2.jhyy:5:9
+            ASSIGN @t2.jhyy:5:9
+              INDEX @t2.jhyy:5:9
+                IDENT @t2.jhyy:5:9 name=arr
+                INT @t2.jhyy:5:13 value=1 prim=2
+              INT @t2.jhyy:5:18 value=8 prim=2
+"""
+
+
 def self_test() -> int:
     """证明这个 emitter **能对** —— 断言的是**期望的 C 文本**，不是 observed 反推。"""
     c = Emitter(target="host").emit(parse(SELF_TEST_SRC))
@@ -381,8 +445,37 @@ def self_test() -> int:
     assert "int main(void)" in v, v
     assert "extern int32_t printf(char *fmt);" in v, v
 
+    # 数组 / 索引 / else
+    c2 = Emitter(target="host").emit(parse(SELF_TEST_SRC2))
+    expect2 = [
+        "int32_t arr[3] = {1, 2, 3};",   # 数组声明：名字插在类型与长度之间
+        "    if (arr) {",                 # if 条件
+        "    }",                          # then 块收尾
+        "    else {",                     # else 分支
+        "((arr[0]) = 9)",                # 索引 + 赋值
+        "((arr[1]) = 8)",                # else 里的索引 + 赋值
+    ]
+    for e in expect2:
+        assert e in c2, f"C 里缺：{e!r}\n---- 实际 ----\n{c2}"
+
+    # 切片**不支持**（长度会丢 ⇒ 不能悄悄发出去）
+    try:
+        Emitter(target="host").emit(parse(
+            "MODULE @s:1:1 no_std=0 ndecls=1\n"
+            "  FUNC_DECL @s:1:1 name=main_jhyy nparams=0 extern=0 inline=0 naked=0\n"
+            "    BLOCK @s:1:1 nstmts=1\n"
+            "      LET @s:2:5 mut=0 name=sl\n"
+            "        SLICE_RANGE @s:2:14\n"
+            "          IDENT @s:2:14 name=arr\n"
+            "          INT @s:2:18 value=0 prim=2\n"
+            "          INT @s:2:21 value=2 prim=2\n"))
+    except EmitError:
+        pass
+    else:
+        raise AssertionError("切片应该报错（长度会丢），却悄悄发出来了")
+
     print("✔ 自测通过：extern 原型（vex 发 / host 不发）/ struct / 入口改名 / "
-          "let / 推导 / while / 赋值")
+          "let / 推导 / while / 赋值 / 数组 / 索引 / else / 切片报错")
     return 0
 
 

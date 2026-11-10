@@ -1,0 +1,14 @@
+// 数组：类型 / 字面量 / 索引 / 赋值
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+fn main_jhyy() -> i32 {
+    let mut arr: [i32; 4] = [1, 2, 3, 4];
+    let f = "a=%d\n" as *u8;
+    arr[0] = 10;
+    arr[3] = arr[1] + arr[2];
+    printf(f, arr[0]);
+    printf(f, arr[1]);
+    printf(f, arr[2]);
+    printf(f, arr[3]);
+    return arr[0] + arr[1] + arr[2] + arr[3];
+}

@@ -57,11 +57,33 @@ big=7
 | 常量（`INT` / `STRING`） | ✔ |
 | `let`（**带类型**或可推导） | ✔ `mut` 在 C 侧无对应，忽略 |
 | 算术 / 比较 / 逻辑 | ✔ `BINARY` 的 `op` 直接落 C |
-| `if` / `while` | ✔ |
+| `if` / `else` / `while` | ✔ |
 | 函数调用（含 `extern fn`） | ✔ |
 | `extern fn` 声明 | ✔ VEX 目标**发**原型（= 绑定面 ABI 的检查器）；host 目标**不发**（libc 头文件拥有） |
 | 字符串字面量 | ✔ |
 | struct 布局 / struct 字面量 / 字段访问 | ✔ |
+| 数组（类型 / 字面量 / 索引 / 赋值） | ✔ 固定长度 ⇒ 直接落 C 数组 |
+| 切片（`a[0..2]`） | ✘ **报错** —— C 里没有切片，**长度会丢** ⇒ 按验收线 § 3.1 记进问题清单，不悄悄发出去 |
+
+## 语料（覆盖面可度量）
+
+单个样例只能证明"那一个程序能过"；**语料**把覆盖面变成可度量的 ——
+加一个特性 ⇒ 加一个语料 ⇒ 门立刻知道它有没有被覆盖。
+
+```bash
+bash spike/day1-emit/corpus-run.sh     # 整个语料跑两条路，逐字比
+```
+
+| 语料 | 覆盖 |
+|---|---|
+| `corpus/01_arith.jhyy` | 算术 / 比较 / 类型推导 / 显式类型 |
+| `corpus/02_control.jhyy` | `if` / `else` / `while` / `%` |
+| `corpus/03_struct.jhyy` | struct 定义 / 字面量 / 字段 / 传参 / 返回 |
+| `corpus/04_array.jhyy` | 数组类型 / 字面量 / 索引 / 赋值 |
+
+> ⚠️ 语料程序自己的 bug 也会让门红 —— 第一次跑就抓到过
+> 「格式串两个 `%d` 只传一个参数」⇒ 第二个 `%d` 读垃圾 ⇒ 未定义行为。
+> **对拍的前提是两边跑的是同一个确定性的程序。**
 
 ## 已知的坑（记下来，不在 emitter 里绕过 —— 验收线 § 3.1）
 
@@ -119,5 +141,7 @@ bash spike/day1-emit/build-vex.sh
 | `hello.jhyy` | host 对拍样例：最小子集每样都用一点 |
 | `vex_demo.jhyy` | VEX 样例：调绑定面 |
 | `run.sh` | host 闭环 + 对拍门 |
+| `corpus-run.sh` | **语料**对拍门（整个 corpus/ 逐个比） |
+| `corpus/` | 语料：算术 / 控制流 / struct / 数组 |
 | `build-vex.sh` | VEX 产物：dump → C → `.bin` + 符号核对 |
 | `vex/` | VEX 工程（makefile / vex/ / 共享绑定面 / 生成的 `src/main.c`） |

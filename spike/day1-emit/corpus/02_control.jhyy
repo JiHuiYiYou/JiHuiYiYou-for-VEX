@@ -1,0 +1,23 @@
+// if / else / while
+//
+// ⚠️ 每个 printf 一个 %d —— 格式串里 %d 的个数必须与实参个数**一致**
+//    （语料门第一次跑就抓到过这里写错：两个 %d 只传一个参数 ⇒ 读到垃圾 ⇒ 未定义行为）
+extern fn printf(fmt: *u8, v: i32) -> i32;
+
+fn main_jhyy() -> i32 {
+    let mut i: i32 = 0;
+    let mut total: i32 = 0;
+    let f = "i=%d\n" as *u8;
+    let g = "t=%d\n" as *u8;
+    while i < 5 {
+        if i % 2 == 0 {
+            total = total + i;
+        } else {
+            total = total - i;
+        }
+        printf(f, i);
+        printf(g, total);
+        i = i + 1;
+    }
+    return total;
+}
