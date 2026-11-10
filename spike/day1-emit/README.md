@@ -83,10 +83,32 @@ JHYY 语义锁 64 位，但**这条路不受影响** —— emitter 发的是 C 
 
 ## 下一步
 
-1. **VEX 目标的 `.bin`**：把 `hello.jhyy` 换成调绑定面的版本（`jhyy_vex_display_puts`），
-   `--target vex` 出 C ⇒ 用 `spike/day0-c` 的 makefile 编 ⇒ **烧到 Brain 上跑**（A 路真产物）
+1. ⏳ **烧到 Brain 上跑**（缺一次实验室）：`vex/build/day1vex.bin` 已就绪（2516 B）
 2. **子集补齐**：`else` 分支、数组、切片、函数指针（按需要排）
 3. **overlay**：C 路完全够用 ⇒ **ARM 后端（B 路）才需要 overlay**（验收线 § 3.4.3 的共享层风险）
+
+## A 路真产物（2026-11-10 已就绪）
+
+`vex_demo.jhyy`（**第一份真 JHYY 源码**：调绑定面在 Brain 屏上出字）
+⇒ `build-vex.sh` ⇒ `vex/build/day1vex.bin`（2516 B）
+
+```bash
+bash spike/day1-emit/build-vex.sh
+```
+
+它做五件事：dump → 发 C（`--target vex`）→ **核对生成物与入库那份逐字节相同**（防漂移）
+→ 编 VEX 工程 → **核对入口符号 `main` 不带修饰 + 绑定面符号在产物里**。
+
+已核实（事实基线 § 2.1）：
+
+- `jhyy_vex.o` 与黄金参考 `day0-c` 的哈希**完全相同** ⇒
+  **A 路与黄金参考调的是同一个绑定面符号**，在**字节层面**坐实 ✓
+- 入口符号 `main` 存在且**不带修饰**（VEX 的 `vexMain` 用 `R_ARM_ABS32 main` 取它）✓
+- 产物逐字节可复现 ✓
+
+> ⚠️ **还没在 Brain 上跑过**（缺一次实验室）。
+> `vex/src/main.c` 是**生成的**（入库是为了 GUI 里打开就能编）⇒
+> emitter 一改，`build-vex.sh` 会**红**并告诉你要重新生成 ✓
 
 ## 文件
 
@@ -94,5 +116,8 @@ JHYY 语义锁 64 位，但**这条路不受影响** —— emitter 发的是 C 
 |---|---|
 | `astdump.py` | 解析 `jhyy dump` 的 AST 文本（带 `--self-test`） |
 | `emit_c.py` | AST → C（带 `--self-test`） |
-| `hello.jhyy` | 样例：最小子集每样都用一点 |
-| `run.sh` | 闭环 + 对拍门 |
+| `hello.jhyy` | host 对拍样例：最小子集每样都用一点 |
+| `vex_demo.jhyy` | VEX 样例：调绑定面 |
+| `run.sh` | host 闭环 + 对拍门 |
+| `build-vex.sh` | VEX 产物：dump → C → `.bin` + 符号核对 |
+| `vex/` | VEX 工程（makefile / vex/ / 共享绑定面 / 生成的 `src/main.c`） |

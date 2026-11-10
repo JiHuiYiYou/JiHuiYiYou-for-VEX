@@ -259,6 +259,10 @@ class Emitter:
             cname = C_ENTRY if name == ENTRY_NAME else name
             ret = node.kid("RET")
             rtype = self.c_type(ret.children[0]) if ret and ret.children else "void"
+            if name == ENTRY_NAME:
+                # ⚠️ C 的入口返回类型必须**字面**是 `int` ——
+                #    clang 会警告 "return type of 'main' is not 'int'"（-Wmain-return-type）。
+                rtype = "int"
             params = ", ".join(
                 (f"{t}{n}" if t.endswith("*") else f"{t} {n}")
                 for n, t in self.func_params.get(name, [])
@@ -358,7 +362,7 @@ def self_test() -> int:
         "typedef struct {",                          # struct → typedef
         "    int32_t x;",
         "} P;",
-        "int32_t main(void) {",                      # main_jhyy → main
+        "int main(void) {",                          # main_jhyy → main（返回类型必须是字面 int）
         "    int32_t i = 0;",                        # let 带类型
         "    P a = ((P){ .x = 1, .y = 2 });",        # struct 字面量 + 推导类型
         "    while ((i < 3)) {",                     # while
@@ -374,7 +378,7 @@ def self_test() -> int:
     #            ⇒ 正好当绑定面 ABI 的检查器）
     v = Emitter(target="vex").emit(parse(SELF_TEST_SRC))
     assert '#include "v5.h"' in v, v
-    assert "int32_t main(void)" in v, v
+    assert "int main(void)" in v, v
     assert "extern int32_t printf(char *fmt);" in v, v
 
     print("✔ 自测通过：extern 原型（vex 发 / host 不发）/ struct / 入口改名 / "

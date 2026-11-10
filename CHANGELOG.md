@@ -21,6 +21,12 @@ and emits C. The main repo is untouched — the bypass is real from the first co
 `hello.jhyy` compiled both ways — through the main repo's own compiler (the yardstick) and
 through the emitter — produces **byte-identical stdout and the same exit code**.
 
+**And the first real A-route product exists:** `spike/day1-emit/vex_demo.jhyy` — the first
+program written in actual JHYY — compiles through the emitter into a V5 binary
+(`day1vex.bin`, 2516 B). Its binding-surface object is **byte-identical to the golden
+reference's**, so the JHYY route and the hand-written C route provably call the same symbol.
+The entry symbol is a plain, unmangled `main`, which is what VEX's `vexMain` looks up.
+
 **The repository's relationship to the language main repo is now fixed: permanent bypass.**
 The main repo keeps the language; this repo keeps the VEX target support. Nothing is pushed back
 into the main repo, and the main repo's working tree is never touched — the compiler is consumed
