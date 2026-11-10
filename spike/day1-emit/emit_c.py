@@ -199,6 +199,8 @@ class Emitter:
             return PRIM_TO_C.get(prim, "int32_t")
         if k == "STRING":
             return "uint8_t *"
+        if k == "BOOL":
+            return "bool"
         if k == "FLOAT":
             return "double"
         if k == "UNARY":
@@ -265,6 +267,9 @@ class Emitter:
             return f"{name}.{fld}" if fld else name
         if k == "INT":
             return node.get("value") or "0"
+        if k == "BOOL":
+            # ⚠️ dump 里 `value=true` / `value=false`（**不是** 1/0）
+            return "true" if (node.get("value") or "") == "true" else "false"
         if k == "STRING":
             # AST 的 chars 是**转义过的文本**，且 dump 有损（见 decode_dump_string）
             return c_string_literal(decode_dump_string(node.get("chars") or '""'))

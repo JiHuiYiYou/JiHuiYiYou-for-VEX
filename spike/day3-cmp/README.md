@@ -18,21 +18,29 @@ C++ 参考是**同一段逻辑的另一种写法**（像 7262A 那样用 `vex::`
 
 1. 取 PORT1 的电机句柄
 2. 配置：齿轮组 **18:1** / 刹车 **Brake** / 编码器单位 **Degrees**
-3. 速度 **50 RPM**，转 **500 ms**
-4. 读**实测**速度（绝对编码器，RPM）⇒ 判断「电机到底转没转」
-5. 读**回**刹车模式（★ **enum 返回** ⇒ r0 高 3 字节未定义 ⇒ **B 路必须掩码 0xff**）
-6. 停机
-7. 屏显两行
+3. **读回**三个配置（刹车 / 编码器单位 / 齿轮组）—— ★ **enum 返回** ⇒ B 路要掩码
+4. 速度 **50 RPM**，转 **500 ms**，读**实测**速度（绝对编码器，RPM）
+5. **反转标志**实验：置上 → **再读一次** → 再转一次 → 看方向反没反
+6. 停机 + 复位标志
+7. 屏显**四行**
 
-屏显（两条路显示**同样的字**，所以拍照就能比）：
+屏显（三条路显示**同样的字**，所以拍照就能比）：
 
 ```
-(1, 1)   MOTOR MOVED   |   MOTOR DID NOT MOVE
-(1, 20)  BRAKE READBACK OK   |   BRAKE READBACK BAD
+(1,  1)  MOTOR MOVED  |  MOTOR NO MOVE      ← 电机到底转没转
+(1, 20)  CONFIG OK    |  CONFIG BAD         ← 三个配置读回来对不对
+(1, 40)  REVF FLIP    |  REVF SAME | REVF NA ← 反转标志到底改不改方向
+(1, 60)  JHY CMP DONE                         ← 跑到底了（不是卡住）
 ```
 
 > 「实测速度」用的是**绝对编码器**（`vexDeviceAbsEncVelocityGet`）——
 > `vexDeviceMotorVelocityGet` 返回的是**命令值**，不是实测值（别用错）。
+>
+> `REVF` 那条**顺带补上规格书最后一个缺口**（§ 13.1「还缺的」）：
+> 上一轮探针测不出结论，是因为**探针自己有 bug** —— 置完标志又走了一遍
+> `config_motor()`，可能把标志清了 ⇒ 读回全同，分不清是「标志被清」还是
+> 「标志本来就不影响读回」。这里改成 **先 config → 再置标志 → 再 spin**，
+> 并且 **spin 之后再读一次标志** ⇒ 两种情况能分开（标志没置上 ⇒ `REVF NA`）。
 
 ## 编一遍
 
@@ -81,14 +89,19 @@ call:
 |---|---|
 | 取句柄 | `vexDeviceGetByIndex` |
 | 配置 | `vexDeviceMotorGearingSet` / `vexDeviceMotorBrakeModeSet` / `vexDeviceMotorEncoderUnitsSet` |
+| 配置**读回** | `vexDeviceMotorBrakeModeGet` / `vexDeviceMotorEncoderUnitsGet` / `vexDeviceMotorGearingGet` |
 | 动作 | `vexDeviceMotorVelocitySet` |
-| 测量 | `vexDeviceAbsEncVelocityGet` / `vexDeviceMotorBrakeModeGet` |
+| 反转标志 | `vexDeviceMotorReverseFlagSet` / `vexDeviceMotorReverseFlagGet` |
+| 测量 | `vexDeviceAbsEncVelocityGet` |
 | 延时 | `vexDelay` |
 | 屏显 | `jhyy_vex_display_puts`（**我们的非变参封装**，不是 `vexDisplayPrintf`） |
 
 ⚠️ **enum 传参**：JHYY 侧没有 enum ⇒ 传**序号**（`0/1/2`），
 C 侧隐式转成 SDK 的 enum。序号表在绑定面表里（`ENUMS`）。
-⚠️ **enum 返回**：1 字节 ⇒ `r0` 高 3 字节未定义 ⇒ **B 路掩码 `0xff`**（实测产物里有这条 `and`）。
+⚠️ **1 字节返回**（3 个 enum + 1 个 `bool`）⇒ `r0` 高 3 字节未定义 ⇒
+**B 路掩码 `0xff`**（实测产物里有 4 条 `and r0, r0, #0xff`）。
+⚠️ **bool 实参**（`ReverseFlagSet`）：1 字节 ⇒ B 路传**零扩展的 32 位值**
+⇒ callee 按 1 字节读（低字节）或按 4 字节读（整个字）**都对**。
 
 ## 上机之后
 

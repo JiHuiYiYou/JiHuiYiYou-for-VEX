@@ -156,6 +156,8 @@ class AsmEmitter:
                     8: "float", 9: "double", 10: "bool"}.get(prim, "int32_t")
         if k == "STRING":
             return "char *"
+        if k == "BOOL":
+            return "bool"
         if k == "STRUCT_LIT":
             return node.get("type") or "int32_t"
         if k == "CALL":
@@ -190,6 +192,10 @@ class AsmEmitter:
         if k == "STRING":
             label = self.str_lit(node.get("chars") or '""')
             return [f"    ldr r0, ={label}"]
+        if k == "BOOL":
+            # ⚠️ dump 里 `value=true` / `value=false`（**不是** 1/0）
+            v = 1 if (node.get("value") or "") == "true" else 0
+            return [f"    movw r0, #{v}", "    movt r0, #0"]
         if k == "IDENT":
             name = node.get("name") or ""
             if name not in self.locals:
@@ -301,10 +307,15 @@ class AsmEmitter:
                     f"调用点 {len(args)} 个")
             for _, jt in b.jhyy_params:
                 w = binding_surface.jhyy_width(jt)
-                if w != 4:
+                # ⚠️ AAPCS：宽度 ≤ 4 字节的实参放在 r0–r3 的**低字节**，高位未定义。
+                #    B 路一律传**零扩展的 32 位值**（槽位恒为 4 字节）⇒
+                #    callee 按 1 字节读（bool / 短 enum）读到低字节 ✔
+                #    callee 按 4 字节读（int32）读到整个字 ✔
+                #    ⇒ **两种宽度都合法**，只要 ≤ 4 字节。
+                if w > 4:
                     raise AsmError(
                         f"{name} 的实参类型 {jt} 是 {w} 字节 —— "
-                        f"B 路只支持 4 字节实参")
+                        f"B 路只支持 ≤ 4 字节的实参")
         if len(args) > 4:
             raise AsmError(f"实参超过 4 个暂不支持（AAPCS 的栈传参还没做）：{name}")
         out: list[str] = []
@@ -319,7 +330,7 @@ class AsmEmitter:
         out += [f"    bl {name}"]
         if self.depth % 2 != 0:
             out += ["    pop {r12}"]
-        if b is not None and b.ret_enum:
+        if b is not None and b.ret_narrow:
             # ★ enum 返回：AAPCS 里 1 字节的返回值**只有低字节有定义**
             #   ⇒ r0 的高 3 字节是垃圾 ⇒ 必须掩码（A 路由 clang 负责）
             out += ["    and r0, r0, #0xff"]

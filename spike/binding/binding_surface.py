@@ -83,7 +83,7 @@ class Binding:
     c_params: tuple[tuple[str, str], ...]      # (形参名, C 类型)
     # ── 其它 ──
     kind: str = "direct"        # direct = 直接绑 SDK 的符号；wrapper = 我们自己的封装
-    ret_enum: bool = False      # 返回值是 enum ⇒ B 路要掩码
+    ret_narrow: bool = False    # 返回值是 **1 字节**（enum / bool）⇒ B 路要掩码 0xff
     note: str = ""
     enum_arg: tuple[str, int] | None = None    # (enum 类型名, 实参位置)
 
@@ -120,7 +120,7 @@ class Binding:
         for _, jt in self.jhyy_params:
             widths.append(jhyy_width(jt))
         ret_w = jhyy_width(self.jhyy_ret) if self.jhyy_ret else 0
-        mask = "（enum 返回 ⇒ 掩码 0xff）" if self.ret_enum else ""
+        mask = "（1 字节返回 ⇒ 掩码 0xff）" if self.ret_narrow else ""
         return (f"实参 {widths} ⇒ 寄存器 r0..r{len(widths) - 1}；"
                 f"返回 {ret_w or 'void'} 字节{mask}")
 
@@ -203,9 +203,46 @@ BINDINGS: list[Binding] = [
         jhyy_ret="i32",
         c_ret="V5MotorBrakeMode",
         c_params=(("device", "V5_DeviceT"),),
-        ret_enum=True,
-        note="★ **enum 返回** ⇒ r0 的高 3 字节未定义 ⇒ B 路必须掩码 0xff；"
+        ret_narrow=True,
+        note="★ **enum 返回**（1 字节）⇒ r0 的高 3 字节未定义 ⇒ "
              "A 路由 clang 负责。",
+    ),
+    Binding(
+        name="vexDeviceMotorEncoderUnitsGet",
+        jhyy_params=(("dev", "*u8"),),
+        jhyy_ret="i32",
+        c_ret="V5MotorEncoderUnits",
+        c_params=(("device", "V5_DeviceT"),),
+        ret_narrow=True,
+        note="用来**读回**编码器单位（enum 返回，1 字节）。",
+    ),
+    Binding(
+        name="vexDeviceMotorGearingGet",
+        jhyy_params=(("dev", "*u8"),),
+        jhyy_ret="i32",
+        c_ret="V5MotorGearset",
+        c_params=(("device", "V5_DeviceT"),),
+        ret_narrow=True,
+        note="用来**读回**齿轮组（enum 返回，1 字节）。",
+    ),
+    Binding(
+        name="vexDeviceMotorReverseFlagSet",
+        jhyy_params=(("dev", "*u8"), ("flag", "bool")),
+        jhyy_ret="",
+        c_ret="void",
+        c_params=(("device", "V5_DeviceT"), ("value", "bool")),
+        note="反转标志。**必须在 config 之后置**（置完再 config 可能被清 —— "
+             "这正是上一轮探针测不出结论的原因，事实基线 § 13.2）。",
+    ),
+    Binding(
+        name="vexDeviceMotorReverseFlagGet",
+        jhyy_params=(("dev", "*u8"),),
+        jhyy_ret="bool",
+        c_ret="bool",
+        c_params=(("device", "V5_DeviceT"),),
+        ret_narrow=True,
+        note="C 的 `_Bool`，**1 字节**。spin 之后再读一次 ⇒ "
+             "能分清「标志被清」还是「标志本来就不影响读回」。",
     ),
     Binding(
         name="vexDeviceAbsEncVelocityGet",
@@ -336,10 +373,11 @@ def self_test() -> int:
     zero = Binding(name="f", jhyy_params=(), jhyy_ret="", c_ret="void", c_params=())
     assert zero.c_proto == "void f(void);", zero.c_proto
 
-    # 4. enum 返回的条目必须标 ret_enum，且 enum 类型在 SHORT_ENUM_TYPES 里
+    # 4. 1 字节返回的条目必须标 ret_narrow，且返回类型在短 enum / bool 名单里
     for b in BINDINGS:
-        if b.ret_enum:
-            assert b.c_ret in SHORT_ENUM_TYPES, f"{b.name} 的返回类型 {b.c_ret} 不在短 enum 名单里"
+        if b.ret_narrow:
+            assert (b.c_ret in SHORT_ENUM_TYPES or b.c_ret == "bool"), \
+                f"{b.name} 的返回类型 {b.c_ret} 不在 1 字节名单里"
         if b.enum_arg:
             etype = b.enum_arg[0]
             assert etype in ENUMS, f"{b.name} 的 enum 实参 {etype} 没登记序号"
@@ -358,6 +396,7 @@ def self_test() -> int:
     # 7. ABI 摘要
     assert "r0..r1" in BY_NAME["vexDeviceMotorVelocitySet"].abi_note()
     assert "掩码 0xff" in BY_NAME["vexDeviceMotorBrakeModeGet"].abi_note()
+    assert "掩码 0xff" in BY_NAME["vexDeviceMotorReverseFlagGet"].abi_note()
 
     # 8. JHYY 宽度
     assert jhyy_width("*u8") == 4 and jhyy_width("u32") == 4 and jhyy_width("i32") == 4
@@ -365,7 +404,7 @@ def self_test() -> int:
     print(f"✔ 自测通过：绑定面表 {len(BINDINGS)} 条"
           f"（direct {sum(1 for b in BINDINGS if b.kind == 'direct')}"
           f" / wrapper {sum(1 for b in BINDINGS if b.kind == 'wrapper')}）"
-          f" / enum 返回 {sum(1 for b in BINDINGS if b.ret_enum)} 条")
+          f" / 1 字节返回 {sum(1 for b in BINDINGS if b.ret_narrow)} 条)")
     return 0
 
 
@@ -379,8 +418,8 @@ def to_markdown() -> str:
         note = b.note
         if b.enum_arg:
             note += " " + b.enum_arg_note()
-        if b.ret_enum:
-            note += " ★ enum 返回 ⇒ B 路掩码 0xff。"
+        if b.ret_narrow:
+            note += " ★ 1 字节返回 ⇒ B 路掩码 0xff。"
         lines.append(f"| `{b.jhyy_decl}` | `{b.c_proto}` | {note} |")
     return "\n".join(lines)
 
