@@ -70,6 +70,7 @@ JHYY 源码 ──────┤                              ├─→ arm-non
 |---|---|
 | 第 0 步 | ✅ **规格书已完成** —— **八项全部实测**，最后一项在真 Brain 上测得（tick 频率 = **100 Hz**，2026-11-09）；屏显细节（`bOpaque` 语义、文字坐标单位）仍待测 —— 探针已备好：[`spike/day0-lab/`](spike/day0-lab) |
 | 第 1–2 步 | 🔶 **emitter 发 C —— 第一个闭环已通**（2026-11-10）：同一个 `hello.jhyy`，主仓编译器那条路与本仓 emitter 那条路，**stdout 逐字相同 + 返回码相同**。下一步：VEX 的 `.bin` + 真机跑 —— [`spike/day1-emit/`](spike/day1-emit) |
+| B 路 | 🔶 **直出 ARM 机器码以探针形式走通**（2026-11-10）：[`spike/route-b/`](spike/route-b) 发的是 **ARM 汇编**而不是 C；三条路的绑定面 `.o` **逐字节相同** |
 | 第 3 步 | ⬜ 对拍 + 规格书收口 |
 | B 阶段 | ⬜ JHYY 的 ARM 后端 |
 

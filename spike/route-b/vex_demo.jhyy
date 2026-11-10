@@ -1,0 +1,15 @@
+// vex_demo.jhyy —— **A 路的第一份"真 JHYY 源码"**
+//
+// 它做的事 = 手写 C 的黄金参考 `spike/day0-c` 一模一样：
+//   在 Brain 屏上出一行字 ⇒ 证明 **JHYY → C → clang → .bin** 这条路
+//   调的是**同一个绑定面符号** `jhyy_vex_display_puts`（事实基线 § 9.2）。
+
+extern fn jhyy_vex_display_puts(xpos: i32, ypos: i32, text: *u8);
+extern fn vexDelay(ms: u32);
+
+fn main_jhyy() -> i32 {
+    let msg = "jhyy on vex\n" as *u8;
+    jhyy_vex_display_puts(1, 1, msg);
+    vexDelay(500 as u32);
+    return 0;
+}

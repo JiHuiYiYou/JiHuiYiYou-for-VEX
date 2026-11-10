@@ -39,6 +39,15 @@ into a shadow directory, overlays this repo's `spike/overlay/*.jhyy`, and builds
 compiler there — the main repo's working tree is never touched. The ARM backend has
 somewhere to land now.
 
+**And route B itself now works as a probe:** `spike/route-b/` turns a JHYY program into
+**ARM assembly** (not C) and builds a V5 binary from it — `routebvex.bin`, 2580 B, ARM-state
+4-byte instructions, no VFP at all (so softfp holds by construction). The binding-surface
+object is **byte-identical across all three routes** — the golden reference, route A and
+route B — so all three provably call the same symbol. Because the emitter picks the
+registers and widths itself, the two shared-layer pointer-width spots in the compiler are
+**bypassed entirely**: the prototype needs no compiler patch, and the decision of whether
+to add a real ARM backend to the compiler can be deferred.
+
 **The repository's relationship to the language main repo is now fixed: permanent bypass.**
 The main repo keeps the language; this repo keeps the VEX target support. Nothing is pushed back
 into the main repo, and the main repo's working tree is never touched — the compiler is consumed
