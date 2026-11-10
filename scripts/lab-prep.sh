@@ -53,18 +53,23 @@ sha256sum \
 
 cat <<'EOF'
 
-=== ⑥ 上机清单 ===
+=== ⑥ 上机清单（详见 Task.md）===
 
-  1. microSD 卡（FAT32、根目录清空）插进 Brain
-  2. Brain 用 USB 连电脑 → VEXcode → 打开 spike/day0-lab 工程 → Download
-     ⇒ 答完 8 题，等屏幕出现 "day0-lab DONE - ANSWERS"，**拍这一张**
-  3. Brain 屏上出现 "jhyy on vex" ⇒ A 路真机跑通 ✔ 拍一张
-  4. **插一个电机到 PORT1**，再跑 Day 3 的三份（VEXcode 打开
-     spike/day3-cmp/vex-a / vex-b / vex-cpp，各点一次 Download）
-     ⇒ 三张屏显应当**逐字相同**：`MOTOR MOVED` + `BRAKE READBACK OK` ⇒ 各拍一张
-  5. 回来把照片给我，剩下我写
+  1. Brain 用 USB 连电脑
+  2. **先把电机插到 PORT1**（先插，再烧 —— 插晚了测不到"电机转没转"）
+  3. VEXcode → 打开 spike/day3-cmp/vex-a/cmp-a.v5code    → Download → 拍一整屏
+  4. VEXcode → 打开 spike/day3-cmp/vex-b/cmp-b.v5code    → Download → 拍一整屏
+  5. VEXcode → 打开 spike/day3-cmp/vex-cpp/cmp-cpp.v5code → Download → 拍一整屏
+  6. 回来把 3 张照片给我，剩下我写
 
-  详细版：docs/第1步-上机清单.md
+  三张屏显应当**逐字相同**，都是这四行：
+     (1,  1)  MOTOR MOVED  |  MOTOR NO MOVE
+     (1, 20)  CONFIG OK    |  CONFIG BAD
+     (1, 40)  REVF FLIP    |  REVF SAME | REVF NA
+     (1, 60)  JHY CMP DONE
+
+  ❌ 不用买 microSD 卡   ❌ 不用跑 day0-lab 探针   ❌ 不用记任何数字
+
 EOF
 
 echo "✔ 产物齐了"

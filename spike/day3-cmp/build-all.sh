@@ -32,6 +32,13 @@ if [ ! -x "$JHY" ]; then
 fi
 mkdir -p "$HERE/build"
 
+# ── ⓪ GUI 工程文件（.v5code）与磁盘上的实际文件一致？──────────────────
+#     不一致 ⇒ 用户在 VEXcode 里打开会看到过期清单（或报"文件不存在"）
+if ! "$PY" "$HERE/make-v5code.py" --check; then
+    echo "[day3-cmp] ❌ .v5code 与磁盘不一致 —— 跑 python spike/day3-cmp/make-v5code.py" >&2
+    exit 1
+fi
+
 # ── ① AST（主仓的命令，主仓一行不改）────────────────────────────────────
 "$JHY" dump "$SRC" > "$HERE/build/cmp.ast"
 echo "[day3-cmp] AST：$HERE/build/cmp.ast"
