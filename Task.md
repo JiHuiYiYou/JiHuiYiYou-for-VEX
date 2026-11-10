@@ -22,6 +22,11 @@
 > ✅ **GUI 工程文件已经备好**（跟上次一样双击就能打开）：
 > `spike/day3-cmp/vex-a/cmp-a.v5code`、`vex-b/cmp-b.v5code`、`vex-cpp/cmp-cpp.v5code`
 > ⇒ 当天**不用**在 VEXcode 里"Open Folder"挑目录，直接双击这三个文件。
+>
+> ✅ **而且这条路已经在 PC 上实测过了**（2026-11-10 19:09/19:10，在 VEXcode GUI 里
+> 对着仓库里的真工程点了 Download）⇒ GUI 编出来的产物**与命令行那份逐字节相同**
+> （`cmpa.bin` = `fc65145e…`、`cmpb.bin` = `7f0589ca…`，与事实基线 § 2.1 一致）
+> ⇒ **烧上去的就是我们核对过的那份二进制**（事实基线 § 2.3.1）。
 
 ### 不用做
 

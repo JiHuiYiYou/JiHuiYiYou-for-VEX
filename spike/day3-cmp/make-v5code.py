@@ -44,7 +44,14 @@ PROJECTS = [
 
 # 与 VEXcode Pro 2023-09 版一致（day0-lab 那份实测能开能烧）
 VERSION = "23.09.1216"
-# 与本机安装的 SDK 完全一致 ⇒ 打开时**不会**弹"升级老工程"
+# ★ `sdk` 字段：写**原值**（实测 2026-11-10，VEXcode 23.09.1216）：
+#   VEXcode 打开工程的动作**发生在读 SDK 元数据之前**（`sdkversion` 此刻还是
+#   初值 `""`）⇒ 它判定"SDK 不同"⇒ 清理工程 ⇒ **存盘时把 `sdk` 写成 `""`**；
+#   但**等 SDK 元数据到了之后，下一次存盘会写回 `20220726_10_00_00`**（实测：
+#   打开后放一会儿，文件里就是这个原值）。
+#   ⇒ 原值才是**稳态** ⇒ 我们写原值 ⇒ 仓库不会被弄脏。
+#   ⚠️ 中间那个 `""` 是**瞬时**状态 ⇒ `--check` 比对时**忽略 `sdk` 字段**
+#      （那是 VEXcode 自己的字段，不是我们的）。
 SDK = "20220726_10_00_00"
 ICON = "USER921x.bmp"
 
@@ -94,6 +101,19 @@ def dumps(obj):
     return json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
 
 
+def _comparable(obj):
+    """比对用：**忽略 `sdk` 字段**。
+
+    ★ 实测 2026-11-10：VEXcode 打开工程时会把 `sdk` **瞬时**写成 `""`
+       （它的 `sdkversion` 此刻还没从 SDK 元数据里读出来），
+       等元数据到了之后下一次存盘又写回原值。
+       ⇒ 那个字段是 **VEXcode 自己的**，不是我们的 ⇒ 不拿它当门。
+    """
+    obj = dict(obj)
+    obj.pop("sdk", None)
+    return obj
+
+
 def main():
     check = "--check" in sys.argv
     bad = 0
@@ -102,15 +122,21 @@ def main():
         if not os.path.isdir(proj_dir):
             print("找不到工程目录：%s" % proj_dir, file=sys.stderr)
             return 2
-        text = dumps(build(title, proj_dir, description))
+        want = build(title, proj_dir, description)
+        text = dumps(want)
         path = os.path.join(proj_dir, "%s.v5code" % title)
         if check:
             if not os.path.isfile(path):
                 print("❌ %s 不存在（跑一次 make-v5code.py）" % path, file=sys.stderr)
                 bad = 1
                 continue
-            old = open(path, encoding="utf-8").read()
-            if old != text:
+            try:
+                have = json.loads(open(path, encoding="utf-8").read())
+            except Exception as e:
+                print("❌ %s 不是合法 JSON：%s" % (path, e), file=sys.stderr)
+                bad = 1
+                continue
+            if _comparable(have) != _comparable(want):
                 print("❌ %s 与生成结果不一致 —— 工程文件清单过期了" % path,
                       file=sys.stderr)
                 print("   跑：python spike/day3-cmp/make-v5code.py", file=sys.stderr)
