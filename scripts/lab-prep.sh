@@ -4,11 +4,12 @@
 # 用法：
 #   bash scripts/lab-prep.sh
 #
-# 做四件事：
+# 做五件事：
 #   ① 重建实机探针的 .bin（spike/day0-lab）
 #   ② 重建 A 路真产物的 .bin（spike/day1-emit/vex，JHYY 源码经 emitter 编出来的）
-#   ③ 把两个 .bin 复制成 program.bin（**直接放进 microSD 卡根目录就能跑**）
-#   ④ 打印哈希 + 指向 docs/第1步-上机清单.md
+#   ③ 重建 B 路真产物的 .bin（spike/route-b/vex，同一份源码但直出机器码）
+#   ④ 重建 Day 3 行为对照的**三份** .bin（A 路 / B 路 / C++ 参考）
+#   ⑤ 把 .bin 复制成 program.bin（**直接放进 microSD 卡根目录就能跑**）+ 打印哈希
 #
 # ⚠️ 产物含 VEX 专有代码（libv5rt.a）⇒ **不进版本库**（.gitignore），
 #    留存口径 = 本地 + 可复现脚本 + 哈希清单（事实基线 § 2.1）。
@@ -27,18 +28,40 @@ bash spike/day1-emit/build-vex.sh >/dev/null
 cp spike/day1-emit/vex/build/day1vex.bin spike/day1-emit/vex/program.bin
 echo "  ✔ spike/day1-emit/vex/program.bin  ($(stat -c %s spike/day1-emit/vex/program.bin) B)"
 
-echo "=== ③ 哈希 ==="
-sha256sum spike/day0-lab/program.bin spike/day1-emit/vex/program.bin | sed 's/^/  /'
+echo "=== ③ B 路真产物（同一份源码 → ARM 汇编 → clang）==="
+bash spike/route-b/build-vex.sh >/dev/null
+cp spike/route-b/vex/build/routebvex.bin spike/route-b/vex/program.bin
+echo "  ✔ spike/route-b/vex/program.bin  ($(stat -c %s spike/route-b/vex/program.bin) B)"
+
+echo "=== ④ Day 3 行为对照的三份（A 路 / B 路 / C++ 参考）==="
+bash spike/day3-cmp/build-all.sh >/dev/null
+cp spike/day3-cmp/vex-a/build/cmp-a.bin     spike/day3-cmp/vex-a/program.bin
+cp spike/day3-cmp/vex-b/build/cmp-b.bin     spike/day3-cmp/vex-b/program.bin
+cp spike/day3-cmp/vex-cpp/build/cmp-cpp.bin spike/day3-cmp/vex-cpp/program.bin
+echo "  ✔ spike/day3-cmp/vex-a/program.bin     ($(stat -c %s spike/day3-cmp/vex-a/program.bin) B)"
+echo "  ✔ spike/day3-cmp/vex-b/program.bin     ($(stat -c %s spike/day3-cmp/vex-b/program.bin) B)"
+echo "  ✔ spike/day3-cmp/vex-cpp/program.bin   ($(stat -c %s spike/day3-cmp/vex-cpp/program.bin) B)"
+
+echo "=== ⑤ 哈希 ==="
+sha256sum \
+    spike/day0-lab/program.bin \
+    spike/day1-emit/vex/program.bin \
+    spike/route-b/vex/program.bin \
+    spike/day3-cmp/vex-a/program.bin \
+    spike/day3-cmp/vex-b/program.bin \
+    spike/day3-cmp/vex-cpp/program.bin | sed 's/^/  /'
 
 cat <<'EOF'
 
-=== ④ 上机清单 ===
+=== ⑥ 上机清单 ===
 
   1. microSD 卡（FAT32、根目录清空）插进 Brain
   2. Brain 用 USB 连电脑 → VEXcode → 打开 spike/day0-lab 工程 → Download
      ⇒ 答完 8 题，等屏幕出现 "day0-lab DONE - ANSWERS"，**拍这一张**
-  3. 再把 program.bin 复制到 microSD 卡根目录（两个产物任选其一带卡跑）
-  4. Brain 屏上出现 "jhyy on vex" ⇒ A 路真机跑通 ✔ 拍一张
+  3. Brain 屏上出现 "jhyy on vex" ⇒ A 路真机跑通 ✔ 拍一张
+  4. **插一个电机到 PORT1**，再跑 Day 3 的三份（VEXcode 打开
+     spike/day3-cmp/vex-a / vex-b / vex-cpp，各点一次 Download）
+     ⇒ 三张屏显应当**逐字相同**：`MOTOR MOVED` + `BRAKE READBACK OK` ⇒ 各拍一张
   5. 回来把照片给我，剩下我写
 
   详细版：docs/第1步-上机清单.md

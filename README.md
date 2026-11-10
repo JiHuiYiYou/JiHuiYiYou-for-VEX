@@ -76,8 +76,19 @@ any of the three unlocked and the two routes cannot be compared against each oth
 | Step 0 | ✅ **Spec done** — **all 8 spec items measured**, the last one on a real Brain on 2026-11-09 (tick frequency = **100 Hz**). The display details (`bOpaque`, the text coordinate unit) are still open — the probe is ready: [`spike/day0-lab/`](spike/day0-lab) |
 | Step 1–2 | 🔶 **Emitter emits C — first closed loop done** (2026-11-10): the same `hello.jhyy` compiled through the main repo's compiler and through this repo's emitter gives **byte-identical output and the same exit code**. Next: the VEX `.bin` and a real Brain run — [`spike/day1-emit/`](spike/day1-emit) |
 | Route B | 🔶 **Direct ARM machine code works as a probe** (2026-11-10): [`spike/route-b/`](spike/route-b) emits ARM assembly instead of C; the binding-surface object is **byte-identical across all three routes** |
-| Step 3 | ⬜ A/B comparison + spec freeze |
+| Step 3 | 🔶 **All three comparison artifacts build** (2026-11-10): **the same logic** written three ways (JHYY→C / JHYY→machine code / hand-written C++), and every static check passes — the binding-surface object is **byte-identical across all three**, the entry symbol `main` is unmangled, route B is ARM-state with no VFP, and **routes A and B call the same functions in the same order**. Next: one lab trip — [`spike/day3-cmp/`](spike/day3-cmp) |
 | Route B | ⬜ JHYY's ARM backend |
+
+### The binding surface is one table
+
+Every `extern fn` has to answer three questions at once: **how JHYY writes it**,
+**what prototype C gets**, and **how AAPCS passes it**. Those used to live in three
+places, so they drifted — measured: emitting prototypes from the JHYY-side signature
+alone produced **4 × `conflicting types`** against `v5.h`.
+
+⇒ They are now **one table**: [`spike/binding/binding_surface.py`](spike/binding/binding_surface.py) —
+**both the route-A and the route-B emitter read it**, so one edit moves both routes;
+`--check-sdk` compares it **verbatim against the SDK headers**.
 
 ### The blocker nobody expects
 
@@ -145,14 +156,20 @@ jhyy-for-vex/
 │   ├── measure-abi.sh        # measure struct layouts and calling conventions
 │   ├── check-docs.py         # docs gate (with --self-test)
 │   ├── check-artifacts.sh    # artifact gate (rebuild + verify the hash list)
+│   ├── self-test.sh          # self-test gate (this repo's Python tools — runs on CI)
 │   └── parse-lab-log.py      # the on-robot log → the spec's observation record
 ├── spike/
+│   ├── binding/              # ★ the binding-surface table (single source of truth)
+│   │   └── binding_surface.py   #   JHYY decl / exact C prototype / ABI, per function
 │   ├── day0-c/               # the Step 0 probe: hand-written C, zero JHYY variables
 │   │   ├── include/jhyy_vex.h # ★ the JHYY binding surface
 │   │   └── src/jhyy_vex.c     #   non-variadic display wrapper
 │   ├── day0-lab/             # the on-robot measurement probe (the five hardware gaps)
 │   │                          # — a real VEXcode project: open it in the GUI and Download
 │   │                          # — it logs its own results to the SD card
+│   ├── day1-emit/            # Step 1–2: the route-A emitter (AST → C) + the gates
+│   ├── route-b/              # Step 1–2: the route-B emitter (AST → ARM assembly)
+│   ├── day3-cmp/             # Step 3: the same logic three ways + the static checks
 │   └── day0-abi/             # the ABI measurement probe
 ├── .github/
 │   ├── workflows/ci.yml

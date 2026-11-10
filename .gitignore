@@ -17,6 +17,14 @@ build/
 *.s
 *.exe
 
+# ⚠️ 例外：**生成的源码要入库** ——
+#    用户在 VEXcode 里打开工程就能编、点 Download（他只负责点 GUI）。
+#    它们是**生成物**，但入库才能让「GUI 里打开就能编」成立。
+#    （生成脚本 `spike/day1-emit/build-vex.sh` / `spike/route-b/build-vex.sh`
+#      / `spike/day3-cmp/build-all.sh` 会核对入库那份与刚生成的**逐字节相同**。）
+!spike/route-b/vex/src/main.s
+!spike/day3-cmp/vex-b/src/main.s
+
 # 探针的待烧录产物（可由 scripts/build-vex.sh 重新生成）
 spike/day0-c/program.bin
 spike/day0-lab/program.bin
@@ -29,6 +37,7 @@ compile_commands.json
 
 # 本机 agent 提示词（不入仓）
 CLAUDE.md
+.claude/
 
 # Python 缓存
 __pycache__/

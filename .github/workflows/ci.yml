@@ -84,6 +84,23 @@ jobs:
       - name: shellcheck
         run: shellcheck -x scripts/*.sh
 
+  self-test:
+    name: 自测门（本仓 Python 工具：AST 解析 / A 路 / B 路 / 绑定面表）
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Setup Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: 自测门
+        # ⚠️ 这道门**不需要 VEXcode Pro V5** ⇒ stock runner 上真能跑
+        #    （产物门才是本地门，见验收线 § 6.2）
+        run: bash scripts/self-test.sh
+
   build-selfhosted:
     name: 产物门（自托管 runner，需 VEXcode Pro V5）
     # 只在**手动触发**且显式勾选时跑 —— 没注册自托管 runner 时不会有排队作业。

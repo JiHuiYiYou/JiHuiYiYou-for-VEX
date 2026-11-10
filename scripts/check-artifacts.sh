@@ -26,7 +26,8 @@ BASELINE="$REPO_DIR/docs/00-事实基线.md"
 # ── 从事实基线 § 2.1 读出期望的 .bin 哈希与大小 ───────────────────────
 # 表格行长这样：
 #   | `.bin` | `build/day0c.bin` | **2804 B** | `d77341bd…` |
-row=$(grep -F '`build/'"$PROJ_NAME"'.bin`' "$BASELINE" | head -1 || true)
+#   | `.bin` | `vex-a/build/cmp-a.bin` | **3020 B** | `…` |   ← 带工程目录前缀的也认
+row=$(grep -F 'build/'"$PROJ_NAME"'.bin`' "$BASELINE" | head -1 || true)
 [ -n "$row" ] || { echo "[check-artifacts] 事实基线 § 2.1 里没有 $PROJ_NAME.bin 的哈希行" >&2; exit 1; }
 
 EXPECT_SHA=$(printf '%s' "$row" | grep -oE '[0-9a-f]{64}' | head -1)

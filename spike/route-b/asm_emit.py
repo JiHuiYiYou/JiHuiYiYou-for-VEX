@@ -35,7 +35,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "day1-emit"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "binding"))
 from astdump import Node, parse  # noqa: E402
+import binding_surface  # noqa: E402
 
 ENTRY_NAME = "main_jhyy"
 C_ENTRY = "main"
@@ -50,6 +52,14 @@ CTYPE_INFO = {
     "int8_t": (1, False), "uint8_t": (1, True),
     "bool": (4, False),
     "char *": (4, False), "uint8_t *": (4, False),
+}
+
+# 绑定面表里 **C 返回类型** → B 路当作什么类型（宽度 + 符号性）
+# ⚠️ enum 返回（V5MotorBrakeMode 等）**掩码之后**落进 4 字节槽 ⇒ 按 i32 算 ✔
+RET_CTYPE = {
+    "V5_DeviceT": "char *",      # 不透明指针，ARM 目标 4 字节
+    "int32_t": "int32_t",
+    "uint32_t": "uint32_t",
 }
 
 
@@ -79,6 +89,7 @@ class AsmEmitter:
         self.frame = 0
         self.depth = 0          # 当前压在栈上的临时值个数（决定对齐）
         self.label_n = 0
+        self.extern_names: set[str] = set()   # `extern fn` 的名字（必须都在绑定面表里）
 
     # ── 小工具 ─────────────────────────────────────────────────────────
     def new_label(self, tag: str) -> str:
@@ -148,6 +159,10 @@ class AsmEmitter:
         if k == "STRUCT_LIT":
             return node.get("type") or "int32_t"
         if k == "CALL":
+            # ★ 绑定面表说了算：返回值的宽度/符号性从**精确 C 原型**推
+            b = binding_surface.lookup(node.children[0].get("name") or "")
+            if b is not None:
+                return RET_CTYPE.get(b.c_ret, "int32_t")
             return "int32_t"        # 保守：调用结果的类型这里不细分
         if k == "IDENT":
             return self.locals.get(node.get("name") or "", "int32_t")
@@ -272,6 +287,24 @@ class AsmEmitter:
     def call(self, node: Node) -> list[str]:
         name = node.children[0].get("name") or ""
         args = node.children[1:]
+        b = binding_surface.lookup(name)
+        if name in self.extern_names:
+            # ★ `extern fn` 必须能在**绑定面表**里查到 ⇒ 名字、实参个数、宽度都有据
+            if b is None:
+                raise AsmError(
+                    f"extern fn {name} 不在绑定面表里"
+                    f"（spike/binding/binding_surface.py）"
+                    f"⇒ 先把它的 JHYY 声明 / 精确 C 原型 / ABI 写进表里")
+            if len(args) != len(b.jhyy_params):
+                raise AsmError(
+                    f"{name} 的实参个数不对：表里 {len(b.jhyy_params)} 个，"
+                    f"调用点 {len(args)} 个")
+            for _, jt in b.jhyy_params:
+                w = binding_surface.jhyy_width(jt)
+                if w != 4:
+                    raise AsmError(
+                        f"{name} 的实参类型 {jt} 是 {w} 字节 —— "
+                        f"B 路只支持 4 字节实参")
         if len(args) > 4:
             raise AsmError(f"实参超过 4 个暂不支持（AAPCS 的栈传参还没做）：{name}")
         out: list[str] = []
@@ -286,6 +319,10 @@ class AsmEmitter:
         out += [f"    bl {name}"]
         if self.depth % 2 != 0:
             out += ["    pop {r12}"]
+        if b is not None and b.ret_enum:
+            # ★ enum 返回：AAPCS 里 1 字节的返回值**只有低字节有定义**
+            #   ⇒ r0 的高 3 字节是垃圾 ⇒ 必须掩码（A 路由 clang 负责）
+            out += ["    and r0, r0, #0xff"]
         return out
 
     # ── 语句 ───────────────────────────────────────────────────────────
@@ -390,7 +427,44 @@ class AsmEmitter:
         return out
 
     # ── 整个文件 ───────────────────────────────────────────────────────
+    def jhyy_type(self, node: Node) -> str:
+        """类型节点 → **JHYY 侧**的类型名（`i32` / `*u8` …）。"""
+        k = node.kind
+        if k == "IDENT":
+            return node.get("name") or ""
+        if k == "UNARY" and node.get("op") == "*":
+            return "*" + self.jhyy_type(node.children[0])
+        raise AsmError(f"类型位置不支持 {k}")
+
+    def collect_externs(self, root: Node) -> None:
+        """★ `extern fn` 必须**在绑定面表里**，且 JHYY 声明要与表一致。
+
+        ⇒ B 路不猜 ABI：表里没有 ⇒ 直接报错。
+        """
+        for d in root.children:
+            if d.kind != "FUNC_DECL" or d.get("extern") != "1":
+                continue
+            name = d.get("name") or ""
+            self.extern_names.add(name)
+            b = binding_surface.lookup(name)
+            if b is None:
+                raise AsmError(
+                    f"extern fn {name} 不在绑定面表里"
+                    f"（spike/binding/binding_surface.py）"
+                    f"⇒ 先把它的 JHYY 声明 / 精确 C 原型 / ABI 写进表里")
+            ret = d.kid("RET")
+            jret = self.jhyy_type(ret.children[0]) if ret and ret.children else ""
+            got = tuple((p.get("name") or "", self.jhyy_type(p.children[0]))
+                        for p in d.kids("PARAM"))
+            if jret != b.jhyy_ret or got != b.jhyy_params:
+                fmt = lambda ps: ", ".join(f"{n}: {t}" for n, t in ps)  # noqa: E731
+                raise AsmError(
+                    f"extern fn {name} 的 JHYY 声明与绑定面表不一致\n"
+                    f"    源码：({fmt(got)}) -> {jret or 'void'}\n"
+                    f"    表里：({fmt(b.jhyy_params)}) -> {b.jhyy_ret or 'void'}")
+
     def emit(self, root: Node) -> str:
+        self.collect_externs(root)
         out: list[str] = [
             "/* 由 spike/route-b/asm_emit.py 从 `jhyy dump` 的 AST 生成 —— 不要手改。",
             " * 探针，不是产品（验收线 § 3.1）。",
@@ -451,6 +525,25 @@ SELF_TEST_SRC = """MODULE @t.jhyy:1:1 no_std=0 ndecls=1
 """
 
 
+# 绑定面表里的 extern fn（★ enum 返回 ⇒ 掩码）
+SELF_TEST_SRC_BINDING = """MODULE @tb.jhyy:1:1 no_std=0 ndecls=2
+  FUNC_DECL @tb.jhyy:1:1 name=vexDeviceMotorBrakeModeGet nparams=1 extern=1 inline=0 naked=0
+    PARAM name=dev
+      UNARY @tb.jhyy:1:1 op=*
+        IDENT @tb.jhyy:1:1 name=u8
+    RET
+      IDENT @tb.jhyy:1:1 name=i32
+  FUNC_DECL @tb.jhyy:2:1 name=main_jhyy nparams=0 extern=0 inline=0 naked=0
+    RET
+      IDENT @tb.jhyy:2:19 name=i32
+    BLOCK @tb.jhyy:2:1 nstmts=1
+      LET @tb.jhyy:3:5 mut=0 name=b
+        CALL @tb.jhyy:3:5
+          IDENT @tb.jhyy:3:5 name=vexDeviceMotorBrakeModeGet
+          INT @tb.jhyy:3:5 value=0 prim=2
+"""
+
+
 def self_test() -> int:
     asm = AsmEmitter().emit(parse(SELF_TEST_SRC))
 
@@ -476,7 +569,23 @@ def self_test() -> int:
     assert "    .section .rodata" in asm, asm
     assert '    .ascii "hi\\n"' in asm, asm
 
-    print("✔ 自测通过：入口改名 / 序言 / 栈帧 / 常量 / 变量 / 算术 / 比较 / 分支 / 返回 / .rodata")
+    # ★ 绑定面：extern fn 从表里查 ABI ⇒ enum 返回必须掩码
+    asm2 = AsmEmitter().emit(parse(SELF_TEST_SRC_BINDING))
+    assert "    bl vexDeviceMotorBrakeModeGet" in asm2, asm2
+    assert "    and r0, r0, #0xff" in asm2, asm2
+
+    # ★ extern fn 不在绑定面表里 ⇒ **报错**（B 路不猜 ABI）
+    try:
+        AsmEmitter().emit(parse(
+            SELF_TEST_SRC_BINDING.replace("name=vexDeviceMotorBrakeModeGet",
+                                          "name=vexDeviceNotInTheTable")))
+    except AsmError as e:
+        assert "不在绑定面表里" in str(e), e
+    else:
+        raise AssertionError("绑定面表里没有的 extern fn 应该报错")
+
+    print("✔ 自测通过：入口改名 / 序言 / 栈帧 / 常量 / 变量 / 算术 / 比较 / 分支 / 返回 / "
+          ".rodata / 绑定面表 / enum 掩码")
     return 0
 
 

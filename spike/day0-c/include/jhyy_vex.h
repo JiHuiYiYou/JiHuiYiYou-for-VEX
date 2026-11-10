@@ -24,6 +24,15 @@
 
 #include "v5.h"
 
+/* ⚠️ `extern "C"` 守卫：**C++ 参考程序**（Day 3 行为对照）也要调这个符号。
+ *    没有守卫的话，C++ 会给 `jhyy_vex_display_puts` 加修饰
+ *    （Itanium mangling）⇒ 链接时找不到 C 侧那个符号。
+ *    ⚠️ 对 **C** 编译时这段是空的 ⇒ 产物（`jhyy_vex.o`）逐字节不变 ✓
+ */
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Brain 屏：在 (xpos, ypos) 处画一行 text。
  *
  * 签名固定、非变参 ⇒ JHYY 侧：
@@ -39,5 +48,9 @@
  * bOpaque 固定 **1**（不透明背景，理由见实现里的注释与事实基线 § 9.6）。
  */
 void jhyy_vex_display_puts(int32_t xpos, int32_t ypos, const char *text);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* JHYY_VEX_H */

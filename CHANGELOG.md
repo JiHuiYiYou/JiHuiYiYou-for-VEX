@@ -15,6 +15,33 @@
 The deliverable of Step 0 is a spec ([`docs/00-事实基线.md`](docs/00-%E4%BA%8B%E5%AE%9E%E5%9F%BA%E7%BA%BF.md))
 and a golden reference, not code.
 
+**The binding surface is one table now, and Day 3's comparison artifacts all build.**
+
+`spike/binding/binding_surface.py` is the single source of truth for the binding surface:
+per function it records the **JHYY declaration**, the **exact C prototype** (copied verbatim
+from the SDK) and the **ABI** (which registers, how wide the return is, whether it needs
+masking). Both emitters — route A (AST → C) and route B (AST → ARM assembly) — read that
+table, so the two routes cannot drift apart, and `--check-sdk` compares it verbatim against
+the SDK headers.
+
+That was not cosmetic. Emitting prototypes from the JHYY-side signature alone produced
+**four `conflicting types` errors** against `v5.h`: `char *` vs `V5_DeviceT`, `int32_t` vs
+a 1-byte enum, and `char *` vs `const char *`. With the exact prototypes in the table, the
+**C compiler becomes the binding surface's ABI checker**.
+
+`spike/day3-cmp/` is Day 3's behaviour comparison: **the same logic written three ways** —
+route A (JHYY → C), route B (JHYY → ARM machine code, *the same JHYY source*), and a
+hand-written C++ reference using the `vex::` classes. All three build, and every static
+check passes: the binding-surface object is **byte-identical across all three** (and with
+the golden reference), the entry symbol is a plain unmangled `main`, route B is ARM-state
+with no VFP at all, and routes A and B call **the same functions in the same order**.
+What is left is the behaviour itself — three photos of the Brain screen.
+
+Two smaller findings are in the spec too: clang's `-Os` **tail-merges** calls with the same
+shape (so comparing call *counts* is the wrong gate — compare the call *set* and *order*),
+and a 1-byte enum return leaves the top three bytes of `r0` undefined, so route B must mask
+them (the `and r0, r0, #0xff` is in the artifact).
+
 **Day 1–2 has started: the C emitter's first closed loop works.**
 `spike/day1-emit/` reads the main repo's `jhyy dump` (its AST tree, already machine-parseable)
 and emits C. The main repo is untouched — the bypass is real from the first commit. The same
@@ -96,6 +123,15 @@ sync duty, and the one gate this repo owes its own bypassed files
 
 **New in the repository:**
 
+- `spike/binding/binding_surface.py` — the binding-surface table: the JHYY declaration, the
+  exact C prototype and the ABI of every bound function, with a self-test and a
+  `--check-sdk` mode that compares the table against the SDK headers verbatim.
+- `spike/day3-cmp/` — the behaviour comparison: one JHYY source compiled two ways plus a
+  C++ reference, and the static checks that prove the two routes line up before the robot
+  ever sees them.
+- `scripts/self-test.sh` — the self-test gate for this repository's Python tools (AST
+  parser, route-A emitter, route-B emitter, binding-surface table). It needs no VEXcode Pro
+  V5, so it runs on CI.
 - `spike/day0-abi/` + `scripts/measure-abi.sh` — the ABI measurement probe. It encodes
   `sizeof` / `alignof` / `offsetof` as global array lengths and reads them back out of the
   symbol table, then disassembles the call sites.

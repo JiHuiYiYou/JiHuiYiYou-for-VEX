@@ -27,7 +27,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "binding"))
 from astdump import Node, parse  # noqa: E402
+import binding_surface  # noqa: E402
 
 
 class EmitError(Exception):
@@ -167,6 +169,20 @@ class Emitter:
         if k == "ARRAY_TYPE":
             elem, size = self.array_info(node)
             return f"{elem}[{size}]"
+        raise EmitError(f"类型位置不支持 {k}")
+
+    def jhyy_type(self, node: Node) -> str:
+        """类型节点 → **JHYY 侧**的类型名（`i32` / `*u8` …）。
+
+        ⚠️ 跟 `c_type` 分开：绑定面表里记的是 **JHYY 侧**的声明
+        （事实基线 § 9.2），而 C 侧的类型由表里的**精确 C 原型**决定
+        （如 `V5_DeviceT` ≠ `char *`）。
+        """
+        k = node.kind
+        if k == "IDENT":
+            return node.get("name") or ""
+        if k == "UNARY" and node.get("op") == "*":
+            return "*" + self.jhyy_type(node.children[0])
         raise EmitError(f"类型位置不支持 {k}")
 
     def array_info(self, node: Node) -> tuple[str, str]:
@@ -342,7 +358,7 @@ class Emitter:
         if k == "ASSIGN":
             return [f"{pad}{self.expr(node.children[0])} = {self.expr(node.children[1])};"]
         if k == "IF":
-            cond = self.expr(node.children[0])
+            cond = self.cond_text(node.children[0])
             blocks = node.children[1:]
             out = [f"{pad}if ({cond}) {{"]
             out += self.body(blocks[:1], ind + 1)
@@ -354,7 +370,7 @@ class Emitter:
                 out.append(pad + "}")
             return out
         if k == "WHILE":
-            cond = self.expr(node.children[0])
+            cond = self.cond_text(node.children[0])
             out = [f"{pad}while ({cond}) {{"]
             out += self.body(node.children[1:], ind + 1)
             out.append(pad + "}")
@@ -372,18 +388,67 @@ class Emitter:
                 out += self.stmt(c, ind)
         return out
 
+    def cond_text(self, node: Node) -> str:
+        """if / while 的**条件**文本。
+
+        ⚠️ **顶层的 `==` / `!=` 少包一层括号** ——
+        clang 的 `-Wparentheses-equality`（`-Wall` 里有）会对
+        `if ((a == b))` 报 "equality comparison with extraneous parentheses"
+        ⇒ VEX 构建（`-Wall`）会**每次都告警** ⇒ 这里去掉那层多余的括号。
+        （只有顶层是相等比较时才去；`||` / `&&` 的顶层不受影响。）
+        """
+        s = self.expr(node)
+        if node.kind == "BINARY" and (node.get("op") or "") in ("==", "!="):
+            return s[1:-1]
+        return s
+
     # ── 声明 ────────────────────────────────────────────────────────────
+    def check_binding(self, decl: Node) -> binding_surface.Binding:
+        """VEX 目标：`extern fn` 必须在**绑定面表**里，且 JHYY 声明要与表一致。
+
+        ⇒ 绑定面表是唯一真相源；表里没有 ⇒ 直接报错（不猜、不悄悄发出去）。
+        ⇒ JHYY 侧声明与表不一致 ⇒ 报错（说明源码或表漂移了）。
+        """
+        name = decl.get("name") or ""
+        b = binding_surface.lookup(name)
+        if b is None:
+            raise EmitError(
+                f"extern fn {name} 不在绑定面表里"
+                f"（spike/binding/binding_surface.py）\n"
+                f"    ⇒ 先把它的 JHYY 声明 / 精确 C 原型 / ABI 写进表里，再来用"
+            )
+        ret = decl.kid("RET")
+        jret = self.jhyy_type(ret.children[0]) if ret and ret.children else ""
+        got = tuple((p.get("name") or "", self.jhyy_type(p.children[0]))
+                    for p in decl.kids("PARAM"))
+        if jret != b.jhyy_ret or got != b.jhyy_params:
+            fmt = lambda ps: ", ".join(f"{n}: {t}" for n, t in ps)  # noqa: E731
+            raise EmitError(
+                f"extern fn {name} 的 JHYY 声明与绑定面表不一致\n"
+                f"    源码：({fmt(got)}) -> {jret or 'void'}\n"
+                f"    表里：({fmt(b.jhyy_params)}) -> {b.jhyy_ret or 'void'}"
+            )
+        return b
+
     def collect(self, root: Node) -> None:
         """先扫一遍：函数签名 + struct 字段（`let` 的类型推导要用）。"""
         for decl in root.children:
             if decl.kind == "FUNC_DECL":
                 name = decl.get("name") or ""
                 ret = decl.kid("RET")
-                self.func_ret[name] = self.c_type(ret.children[0]) if ret and ret.children else "void"
                 params = []
                 for p in decl.kids("PARAM"):
                     params.append((p.get("name") or "", self.c_type(p.children[0])))
                 self.func_params[name] = params
+                if decl.get("extern") == "1" and self.target == "vex":
+                    # ⚠️ VEX 目标：**绑定面表说了算** ——
+                    #    C 侧的类型是表里的**精确 C 原型**（如 `V5_DeviceT`），
+                    #    不是 JHYY 侧那个 `*u8` ⇒ 否则 clang 会报 conflicting types。
+                    b = self.check_binding(decl)
+                    self.func_ret[name] = b.c_ret
+                else:
+                    self.func_ret[name] = (self.c_type(ret.children[0])
+                                           if ret and ret.children else "void")
             elif decl.kind == "TYPE_DECL":
                 name = decl.get("name") or ""
                 sd = decl.kid("STRUCT_DEF")
@@ -421,6 +486,13 @@ class Emitter:
             if node.get("extern") == "1":
                 if self.extern_decls == "omit":
                     return []
+                if self.target == "vex":
+                    # ★ VEX 目标：**逐字**发绑定面表里的精确 C 原型
+                    #   ⇒ v5.h / jhyy_vex.h 会校验它 ⇒ **C 编译器就是 ABI 检查器**
+                    b = binding_surface.lookup(name)
+                    if b is None:
+                        raise EmitError(f"extern fn {name} 不在绑定面表里")
+                    return [f"extern {b.c_proto}"]
                 return [f"extern {proto};"]
             out = [proto + " {"]
             body = node.kid("BLOCK")
@@ -442,6 +514,9 @@ class Emitter:
         if self.target == "vex":
             head += [
                 '#include "v5.h"',
+                # ★ 绑定面头文件 ⇒ 生成的原型会被它**逐字校验**
+                #   （`jhyy_vex_display_puts` 的 `const char *` 与表里一致）
+                '#include "jhyy_vex.h"',
                 "#include <stdint.h>",
                 "#include <stdbool.h>",
             ]
@@ -557,6 +632,30 @@ SELF_TEST_SRC3 = """MODULE @t3.jhyy:1:1 no_std=0 ndecls=1
 """
 
 
+# VEX 目标的自测源：`extern fn` **全部来自绑定面表**
+SELF_TEST_SRC_VEX = """MODULE @tv.jhyy:1:1 no_std=0 ndecls=2
+  FUNC_DECL @tv.jhyy:1:1 name=jhyy_vex_display_puts nparams=3 extern=1 inline=0 naked=0
+    PARAM name=xpos
+      IDENT @tv.jhyy:1:1 name=i32
+    PARAM name=ypos
+      IDENT @tv.jhyy:1:1 name=i32
+    PARAM name=text
+      UNARY @tv.jhyy:1:1 op=*
+        IDENT @tv.jhyy:1:1 name=u8
+    RET
+  FUNC_DECL @tv.jhyy:2:1 name=main_jhyy nparams=0 extern=0 inline=0 naked=0
+    RET
+      IDENT @tv.jhyy:2:19 name=i32
+    BLOCK @tv.jhyy:2:1 nstmts=1
+      EXPR_STMT @tv.jhyy:3:5
+        CALL @tv.jhyy:3:5
+          IDENT @tv.jhyy:3:5 name=jhyy_vex_display_puts
+          INT @tv.jhyy:3:5 value=1 prim=2
+          INT @tv.jhyy:3:5 value=1 prim=2
+          STRING @tv.jhyy:3:5 chars="hi" len=2
+"""
+
+
 def self_test() -> int:
     """证明这个 emitter **能对** —— 断言的是**期望的 C 文本**，不是 observed 反推。"""
     c = Emitter(target="host").emit(parse(SELF_TEST_SRC))
@@ -577,12 +676,33 @@ def self_test() -> int:
     # ⚠️ host 目标**不**发 extern 原型（libc 头文件拥有 ⇒ 重复声明会 conflicting types）
     assert "extern int32_t printf" not in c, c
 
-    # VEX 目标：**发** extern 原型（v5.h 里已有真声明 ⇒ 类型对不上就是 C 错误
-    #            ⇒ 正好当绑定面 ABI 的检查器）
-    v = Emitter(target="vex").emit(parse(SELF_TEST_SRC))
+    # VEX 目标：**逐字**发绑定面表里的精确 C 原型
+    #   ⇒ v5.h / jhyy_vex.h 会校验它 ⇒ C 编译器就是绑定面 ABI 的检查器
+    v = Emitter(target="vex").emit(parse(SELF_TEST_SRC_VEX))
     assert '#include "v5.h"' in v, v
+    assert '#include "jhyy_vex.h"' in v, v
     assert "int main(void)" in v, v
-    assert "extern int32_t printf(char *fmt);" in v, v
+    assert ("extern void jhyy_vex_display_puts(int32_t xpos, int32_t ypos, "
+            "const char *text);") in v, v
+
+    # ★ VEX 目标：`extern fn` 不在绑定面表里 ⇒ **报错**（不猜、不悄悄发出去）
+    try:
+        Emitter(target="vex").emit(parse(
+            SELF_TEST_SRC_VEX.replace("name=jhyy_vex_display_puts",
+                                      "name=vexDeviceNotInTheTable")))
+    except EmitError as e:
+        assert "不在绑定面表里" in str(e), e
+    else:
+        raise AssertionError("绑定面表里没有的 extern fn 应该报错")
+
+    # ★ VEX 目标：JHYY 声明与表不一致 ⇒ **报错**（源码或表漂移了）
+    try:
+        Emitter(target="vex").emit(parse(
+            SELF_TEST_SRC_VEX.replace("name=u8\n", "name=u16\n")))
+    except EmitError as e:
+        assert "与绑定面表不一致" in str(e), e
+    else:
+        raise AssertionError("JHYY 声明与绑定面表不一致时应该报错")
 
     # 数组 / 索引 / else
     c2 = Emitter(target="host").emit(parse(SELF_TEST_SRC2))
@@ -613,8 +733,27 @@ def self_test() -> int:
     else:
         raise AssertionError("切片应该报错（长度会丢），却悄悄发出来了")
 
+    # ⚠️ 顶层 `==` / `!=` 的条件**少一层括号**
+    #    （clang 的 -Wparentheses-equality 会对 `if ((a == b))` 告警 ⇒ VEX 构建会一直告警）
+    c3 = Emitter(target="host").emit(parse(
+        "MODULE @q.jhyy:1:1 no_std=0 ndecls=1\n"
+        "  FUNC_DECL @q.jhyy:1:1 name=main_jhyy nparams=0 extern=0 inline=0 naked=0\n"
+        "    BLOCK @q.jhyy:1:1 nstmts=1\n"
+        "      IF @q.jhyy:2:5\n"
+        "        BINARY @q.jhyy:2:8 op===\n"
+        "          IDENT @q.jhyy:2:8 name=a\n"
+        "          IDENT @q.jhyy:2:10 name=b\n"
+        "        BLOCK @q.jhyy:2:5 nstmts=1\n"
+        "          EXPR_STMT @q.jhyy:3:9\n"
+        "            ASSIGN @q.jhyy:3:9\n"
+        "              IDENT @q.jhyy:3:9 name=a\n"
+        "              INT @q.jhyy:3:13 value=1 prim=2\n"))
+    assert "if (a == b) {" in c3, c3
+    assert "if ((a == b))" not in c3, c3
+
     print("✔ 自测通过：extern 原型（vex 发 / host 不发）/ struct / 入口改名 / "
-          "let / 推导 / while / 赋值 / 数组 / 索引 / else / 切片报错")
+          "let / 推导 / while / 赋值 / 数组 / 索引 / else / 切片报错 / "
+          "条件不多包括号")
     return 0
 
 

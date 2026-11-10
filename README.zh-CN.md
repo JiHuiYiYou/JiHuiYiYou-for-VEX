@@ -71,8 +71,18 @@ JHYY 源码 ──────┤                              ├─→ arm-non
 | 第 0 步 | ✅ **规格书已完成** —— **八项全部实测**，最后一项在真 Brain 上测得（tick 频率 = **100 Hz**，2026-11-09）；屏显细节（`bOpaque` 语义、文字坐标单位）仍待测 —— 探针已备好：[`spike/day0-lab/`](spike/day0-lab) |
 | 第 1–2 步 | 🔶 **emitter 发 C —— 第一个闭环已通**（2026-11-10）：同一个 `hello.jhyy`，主仓编译器那条路与本仓 emitter 那条路，**stdout 逐字相同 + 返回码相同**。下一步：VEX 的 `.bin` + 真机跑 —— [`spike/day1-emit/`](spike/day1-emit) |
 | B 路 | 🔶 **直出 ARM 机器码以探针形式走通**（2026-11-10）：[`spike/route-b/`](spike/route-b) 发的是 **ARM 汇编**而不是 C；三条路的绑定面 `.o` **逐字节相同** |
-| 第 3 步 | ⬜ 对拍 + 规格书收口 |
+| 第 3 步 | 🔶 **行为对照的三份产物都编好了**（2026-11-10）：**同一段逻辑**写成三份（JHYY→C ／ JHYY→机器码 ／ 手写 C++），静态核对全过 —— 绑定面 `.o` 三份**逐字节相同**、入口符号 `main` 不带修饰、B 路 ARM 态无 VFP、**A/B 调的函数集合与顺序相同** ⇒ **差一次上机**：[`spike/day3-cmp/`](spike/day3-cmp) |
 | B 阶段 | ⬜ JHYY 的 ARM 后端 |
+
+### 绑定面只有一张表
+
+每个 `extern fn` 要同时对三件事负责：**JHYY 侧怎么写**、**C 侧发什么原型**、
+**AAPCS 上怎么传**。以前这三件事散在三个地方 ⇒ 必然漂移
+（实测：只按 JHYY 侧签名发原型 ⇒ 与 `v5.h` **4 处 `conflicting types`**）。
+
+⇒ 现在收成**一张表**：[`spike/binding/binding_surface.py`](spike/binding/binding_surface.py) ——
+**A 路 emitter 与 B 路 emitter 都从它读**，改一处 = 改两路；
+还能 `--check-sdk` **与 SDK 头文件逐字比对**。
 
 ### 谁也没料到的拦路虎
 
@@ -134,14 +144,20 @@ jhyy-for-vex/
 │   ├── measure-abi.sh        # 量 struct 布局 / 传参约定
 │   ├── check-docs.py         # 文档门（含自测 --self-test）
 │   ├── check-artifacts.sh    # 产物门（重建 + 核对哈希清单）
+│   ├── self-test.sh          # 自测门（本仓 Python 工具，CI 上跑）
 │   └── parse-lab-log.py      # 实机日志 → 规格书里的观测记录
 ├── spike/
+│   ├── binding/              # ★ 绑定面表（唯一真相源）：JHYY 声明 / 精确 C 原型 / ABI
+│   │   └── binding_surface.py
 │   ├── day0-c/               # Day 0 探针：手写 C，零 JHYY 变量
 │   │   ├── include/jhyy_vex.h # ★ JHYY 绑定面（逐字对应的 extern fn 清单）
 │   │   └── src/jhyy_vex.c     #   非变参屏显封装（变参只发生在 C 内部）
 │   ├── day0-lab/             # 实机测量探针（把只能上硬件测的五件事一次测掉）
 │   │                          # —— 真正的 VEXcode 工程：GUI 里打开就能下载
 │   │                          # —— 结果由它自己写进 SD 卡
+│   ├── day1-emit/            # Day 1–2：A 路 emitter（AST → C）+ 对拍门 + 语料门
+│   ├── route-b/              # Day 1–2：B 路 emitter（AST → ARM 汇编）
+│   ├── day3-cmp/             # Day 3：同一段逻辑的三种写法 + 静态核对
 │   └── day0-abi/             # ABI 测量探针（布局 + 寄存器约定）
 ├── .github/
 │   ├── workflows/ci.yml

@@ -1,0 +1,68 @@
+// cmp.jhyy —— **Day 3 行为对照**的 JHYY 源
+//
+// ★ A 路（JHYY → C → clang）与 B 路（JHYY → ARM 汇编 → clang）
+//   **烧的是同一份源码** ⇒ 两路行为必须一致 ⇒ 这是 ABI 的行为级检查。
+//   C++ 参考（`cpp/main.cpp`）是**同一段逻辑的另一种写法**（vex:: 类）。
+//
+// 逻辑（七步，C++ 参考逐条对应）：
+//   1. 取 PORT1 的电机句柄
+//   2. 配置：齿轮组 18:1 / 刹车 Brake / 编码器单位 Degrees
+//   3. 速度 50 RPM，转 500 ms
+//   4. 读**实测**速度（绝对编码器，RPM）⇒ 判断「电机到底转没转」
+//   5. 读**回**刹车模式（★ enum 返回 ⇒ B 路必须掩码 0xff）
+//   6. 停机
+//   7. 屏显两行 —— 三条路显示**同样的字**
+//
+// ⚠️ 屏显走**非变参封装** `jhyy_vex_display_puts`（不是变参的 vexDisplayPrintf）⇒
+//    三条路调的是**同一个符号**、**同一份语义**（事实基线 § 9.4）。
+
+extern fn vexDeviceGetByIndex(index: u32) -> *u8;
+extern fn vexDeviceMotorGearingSet(dev: *u8, gear: i32);
+extern fn vexDeviceMotorBrakeModeSet(dev: *u8, mode: i32);
+extern fn vexDeviceMotorEncoderUnitsSet(dev: *u8, units: i32);
+extern fn vexDeviceMotorVelocitySet(dev: *u8, velocity: i32);
+extern fn vexDeviceMotorBrakeModeGet(dev: *u8) -> i32;
+extern fn vexDeviceAbsEncVelocityGet(dev: *u8) -> i32;
+extern fn vexDelay(ms: u32);
+extern fn jhyy_vex_display_puts(xpos: i32, ypos: i32, text: *u8);
+
+fn main_jhyy() -> i32 {
+    // ① 句柄（索引 0 = PORT1）
+    let dev = vexDeviceGetByIndex(0);
+
+    // ② 配置 —— 传的是 **enum 序号**（0/1/2），语义见绑定面表
+    vexDeviceMotorGearingSet(dev, 1);       // 1 = 18:1
+    vexDeviceMotorBrakeModeSet(dev, 1);     // 1 = Brake
+    vexDeviceMotorEncoderUnitsSet(dev, 0);  // 0 = Degrees
+
+    // ③ 转 500 ms
+    vexDeviceMotorVelocitySet(dev, 50);
+    vexDelay(500 as u32);
+
+    // ④ 读实测速度（绝对编码器，RPM）
+    let v = vexDeviceAbsEncVelocityGet(dev);
+
+    // ⑤ 读回刹车模式（★ enum 返回 ⇒ r0 的高 3 字节未定义 ⇒ B 路掩码）
+    let brake = vexDeviceMotorBrakeModeGet(dev);
+
+    // ⑥ 停机
+    vexDeviceMotorVelocitySet(dev, 0);
+
+    // ⑦ 屏显两行
+    if v > 20 || v < -20 {
+        jhyy_vex_display_puts(1, 1, "MOTOR MOVED" as *u8);
+    } else {
+        jhyy_vex_display_puts(1, 1, "MOTOR DID NOT MOVE" as *u8);
+    }
+    if brake == 1 {
+        jhyy_vex_display_puts(1, 20, "BRAKE READBACK OK" as *u8);
+    } else {
+        jhyy_vex_display_puts(1, 20, "BRAKE READBACK BAD" as *u8);
+    }
+
+    // main 是被 vexTaskAdd 注册进固件调度器的**一个 task** ⇒ 必须让出时间片
+    while 1 != 0 {
+        vexDelay(100 as u32);
+    }
+    return 0;
+}
