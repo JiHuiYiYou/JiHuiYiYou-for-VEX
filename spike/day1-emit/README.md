@@ -74,7 +74,7 @@ big=7
 | `extern fn` 原型重复声明 | host 上 `printf` 与 stdio.h 冲突 ⇒ **conflicting types** | 加 `--extern-decls auto\|emit\|omit`（auto：vex 发、host 不发） |
 | `*u8` 映成 `unsigned char *` | 每处调用都带指针类型 warning | 探针里 `*u8` → `char *`（VEX 的 C API 与 printf 的 `%s` 都要 `char *`）；**真正定绑定面时逐个 `extern fn` 按 C 侧签名定**（事实基线 § 9.2） |
 | 字段访问的形状 | `p.x` 在 AST 里是 `FIELD` 包一个**带 `field=` 属性的 IDENT** | 已处理（基对象在子节点上） |
-| ★ **主仓 `ad_kv_hex64` 的 hex 打印是坏的**（`compiler/src0/ast_dump.jhyy:86`） | `nib>=10` 算成 `87+(nib-10)`（'W'..'[' 与反斜杠）而不是 `97+...`（'a'..'f'）⇒ **FLOAT 的位模式打印成怪字符** | 探针里**解码还原**（`decode_broken_hex`）⇒ 不改主仓（永久旁路）；★ **已登记为主仓台账 W-227**（2026-11-14）⇒ 修法 = `87` 改 `97`（一个字符） |
+| ✅ **主仓 `ad_kv_hex64` 的 hex 打印（已修）**（`compiler/src0/ast_dump.jhyy:90`） | 此前 `nib>=10` 算成 `87+(nib-10)`（'W'..'[' 与反斜杠）而不是 `97+...`（'a'..'f'）⇒ **FLOAT 的位模式打印成怪字符** | **主仓已修**（2026-11-14，`87` 改 `97`；台账 W-227 已标 RESOLVED）⇒ 探针侧的解码旁路**已撤**（现在就是普通 hex 解析 `parse_hex_bits`）⇒ 读到修前的产物会给出「升级主仓编译器」的可操作报错 |
 | ~~★ **主仓 dump 的字符串转义有损**~~ ⇒ **2026-11-14 撤销：这是误判** | ~~源里的 `"b\\b\n"` 在 dump 里变成 `"b\b\n"` ⇒ 反斜杠被压掉一个~~ ⇒ **实测 dump 与源逐字节相同**（主仓 parser 原样存转义文本） | 起因是**测试文件自己**用 shell heredoc 写 ⇒ 反斜杠被吃掉一个（源里本来就少一个）⇒ 看着像 dump 压掉了它。⇒ 结论撤销；**含反斜杠的字符串在 C 路可靠**（语料 `07_strings.jhyy` 已加双反斜杠用例） |
 
 > ⚠️ 两条的现状**不一样**（2026-11-14 复核）：

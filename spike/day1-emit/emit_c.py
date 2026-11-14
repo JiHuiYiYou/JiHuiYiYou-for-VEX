@@ -36,25 +36,26 @@ class EmitError(Exception):
     """最小子集不支持的东西 —— **记进规格书的问题清单**，不在这里绕过。"""
 
 
-# ⚠️ 主仓 `ast_dump.jhyy:86` 的 `ad_kv_hex64()` 有个**真 bug**：
-#    `nib >= 10` 时算的是 `87 + (nib - 10)`（'W'..'[' '\'）而不是 `97 + ...`（'a'..'f'）
-#    ⇒ FLOAT 的位模式被打印成怪字符（'W' 'X' 'Y' 'Z' '[' '\'）。
-#    ⇒ 这里**解码回来**（不改主仓 —— 永久旁路）。
-#    ★ 已登记为**主仓台账 W-227**（2026-11-14）⇒ 修法 = `87` 改 `97`（一个字符）。
-_HEX_DIGIT_FALLBACK = {
-    "W": "a", "X": "b", "Y": "c", "Z": "d",
-    "[": "e", "\\": "f",
-}
+# ⚠️ 主仓 `ast_dump.jhyy:90` 的 `ad_kv_hex64()` —— 2026-11-14 起**输出的是合法 hex**。
+#    此前 `nib >= 10` 时算的是 `87 + (nib - 10)`（'W'..'[' '\'）而不是 `97 + ...`
+#    ⇒ FLOAT 的位模式被打印成怪字符 ⇒ **主仓台账 W-227**，已由主仓修掉（`87` 改 `97`）。
+#    ⇒ 这里**曾经**需要一个「解码还原」的永久旁路 —— **现在撤掉了**（下面就是普通 hex 解析）。
+#    ⚠️ 万一读到的是**修前**的编译器产物 ⇒ 给出可操作的报错（而不是一个裸 ValueError）。
+_BROKEN_HEX_MARKERS = "WXYZ[\\"
 
 
-def decode_broken_hex(text: str) -> int:
-    """把主仓那个坏掉的 hex 打印**还原**成 64 位整数。"""
+def parse_hex_bits(text: str) -> int:
+    """把 AST dump 的 `bits=0x…` 字段解析成 64 位整数（主仓 W-227 修好后 = 普通 hex）。"""
     s = text.strip()
     if s.startswith("0x"):
         s = s[2:]
-    fixed = "".join(_HEX_DIGIT_FALLBACK.get(ch, ch) for ch in s)
+    if any(ch in _BROKEN_HEX_MARKERS for ch in s):
+        raise EmitError(
+            f"位模式 {text!r} 是**主仓 W-227 未修**的形状（'W'..'\\'）⇒ "
+            "升级主仓编译器（拉最新 main 后 `make`）再跑"
+        )
     try:
-        return int(fixed, 16)
+        return int(s, 16)
     except ValueError as e:
         raise EmitError(f"看不懂的 hex 位模式 {text!r}（{e}）") from e
 
@@ -251,15 +252,15 @@ class Emitter:
     def float_lit(self, node: Node) -> str:
         """FLOAT 节点 → C 的浮点字面量。
 
-        ⚠️ 主仓的 hex 打印是坏的（见 `decode_broken_hex`）⇒ 这里还原位模式，
-        再用 Python 的 repr（**最短往返表示**）出十进制 ⇒ C 的 strtod 解析回来
-        一定是同一个位模式 ✓
+        主仓的 `bits=` 字段**现在是合法 hex**（W-227 已修，2026-11-14）⇒
+        直接解析出位模式，再用 Python 的 repr（**最短往返表示**）出十进制 ⇒
+        C 的 strtod 解析回来一定是同一个位模式 ✓
         """
         prim = int(node.get("prim") or "9")
         if prim != 9:
             raise EmitError("f32 的位模式在 AST dump 里取不回来"
                             "（dump 固定读 8 字节当 i64）⇒ 只支持 f64")
-        bits = decode_broken_hex(node.get("bits") or "0")
+        bits = parse_hex_bits(node.get("bits") or "0")
         val = struct.unpack(">d", bits.to_bytes(8, "big"))[0]
         return repr(val)
 
@@ -634,7 +635,7 @@ SELF_TEST_SRC3 = """MODULE @t3.jhyy:1:1 no_std=0 ndecls=1
         UNARY @t3.jhyy:3:16 op=-
           IDENT @t3.jhyy:3:17 name=a
       LET @t3.jhyy:4:5 mut=0 name=c
-        FLOAT @t3.jhyy:4:16 bits=0x3\\\\8000000000000 prim=9
+        FLOAT @t3.jhyy:4:16 bits=0x3ff8000000000000 prim=9
       LET @t3.jhyy:5:5 mut=0 name=s
         CAST @t3.jhyy:5:15
           STRING @t3.jhyy:5:15 chars="hi\\n" len=4
@@ -774,16 +775,16 @@ def self_test_types() -> int:
 
     expect = [
         "(-(a))",                       # 一元负号
-        "double c = 1.5;",              # FLOAT：坏掉的 hex 还原出来的值
+        "double c = 1.5;",              # FLOAT：位模式 hex 解析出来的值
         '"hi\\n"',                      # 字符串：解码成值再按 C 重编码
         "char * s = ((char *)\"hi\\n\");",
     ]
     for e in expect:
         assert e in c, f"C 里缺：{e!r}\n---- 实际 ----\n{c}"
 
-    # 坏 hex 的还原：'W'..'^' ⇒ 'a'..'f'
-    assert decode_broken_hex("0x3\\\\8000000000000") == 0x3FF8000000000000, \
-        hex(decode_broken_hex("0x3\\\\8000000000000"))
+    # 位模式：主仓 W-227 修好后，dump 的 `bits=` 就是**普通 hex**（不再是 'W'..'\'）
+    assert parse_hex_bits("0x3ff8000000000000") == 0x3FF8000000000000, \
+        hex(parse_hex_bits("0x3ff8000000000000"))
 
     # 字符串：dump **原样**带转义 ⇒ 解码器按转义还原（两种形状都要对）
     # ① 单反斜杠 + 'b' ⇒ 退格（值 = b + BS + 换行）
@@ -795,7 +796,7 @@ def self_test_types() -> int:
     val2 = decode_dump_string('"b\\\\b\\n"')
     assert val2 == "b\\b\n", repr(val2)
 
-    print("✔ 自测通过：一元运算 / 浮点（坏 hex 解码）/ 字符串（解码+重编码，含双反斜杠）")
+    print("✔ 自测通过：一元运算 / 浮点（位模式 hex 解析）/ 字符串（解码+重编码，含双反斜杠）")
     return 0
 
 
