@@ -83,6 +83,31 @@ name does not affect the artifact's bytes; and even if the GUI auto-generates
 `robot-config.*`, the binary is unchanged (`--gc-section` drops the unreferenced empty
 `vexcodeInit`). See spec § 2.3.
 
+**One real compiler bug found and filed — and one of our own findings retracted.**
+
+Reading the main repo's AST dump while building the VEX target turned up a **real bug in
+the compiler's dump tool**: `jhyy dump` prints a float literal's bit pattern with
+`ad_kv_hex64()`, which computes `87 + (nib - 10)` for nibbles >= 10. `'a'` is 97, so
+every hex digit from `a` upwards comes out as `W`, `X`, `Y`, `Z`, `[`, `\` — the bit
+pattern is wrong *and* the output is not valid hex. The convention is confirmed by the
+two other implementations in the same repo: the IL decoder in `compiler/src0/ir.jhyy`
+uses `hex - 87` (correct) and the IL encoder in `compiler/src0/codegen.jhyy` uses
+`48 + nib` plus 39 (also correct) — so this one site is simply off by ten. Filed as
+**W-227** in the main repo's ledger (`JiHuiYiYou/docs/internal/workarounds.md`), with the
+one-character fix noted; the fix itself is a release-level change (editing `compiler/src0/*.jhyy`
+shifts the self-hosted artifact) and is therefore not done from this repository.
+
+**One of our own recorded findings was wrong and has been retracted.** We had written
+down that the AST dump "loses" a backslash in string literals, and had accordingly
+excluded backslash strings from the corpus. Re-measuring on 2026-11-14: the dump is
+**lossless** — the parser stores the escaped text verbatim and the dump prints it
+verbatim, byte for byte. The original observation was a **test artifact**: the corpus
+file had been written through a shell heredoc, which ate one backslash, so the "source"
+we compared against was already missing it. The corpus now contains a double-backslash
+case (the gate compares our emitter's output against the main compiler's, run for real),
+and the emitter's self-test covers both shapes. The lesson is recorded next to the case:
+write backslash-bearing fixtures with the editor tools, never through a heredoc.
+
 **Day 1–2 has started: the C emitter's first closed loop works.**
 `spike/day1-emit/` reads the main repo's `jhyy dump` (its AST tree, already machine-parseable)
 and emits C. The main repo is untouched — the bypass is real from the first commit. The same

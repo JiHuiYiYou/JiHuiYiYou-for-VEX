@@ -1,9 +1,14 @@
-// 字符串：多个字面量 / 常见转义
+// 字符串：多个字面量 / 常见转义 / **反斜杠**
 //
-// ⚠️ 两个坑（都是语料门抓出来的）：
+// ⚠️ 一个坑（语料门抓出来的）：
 //  ① 每个 printf 一个 %d —— 格式串里 %d 的个数必须与实参个数**一致**
-//  ② ⚠️ **不要在字符串里放反斜杠**：AST dump 的字符串转义有损
-//     （源里的 "b\b\n" 在 dump 里变成 "b\b\n"）⇒ C 路不可靠
+//
+// ✅ **反斜杠可以放**（2026-11-14 复核）：AST dump 对字符串**无损**
+//    （主仓 parser 原样存转义文本，dump 逐字打印）⇒
+//    以前记的"dump 转义有损 ⇒ 含反斜杠不可靠"是**误判**：
+//    起因是**测试文件自己**用 shell heredoc 写 ⇒ 反斜杠被吃掉了一个
+//    （源里本来就少一个）⇒ 看着像 dump 压掉了它。
+//    ⚠️ 写这类语料**必须用 Edit / Write 工具落盘**，别走 bash heredoc。
 extern fn printf(fmt: *u8, v: i32) -> i32;
 
 fn main_jhyy() -> i32 {
@@ -11,10 +16,12 @@ fn main_jhyy() -> i32 {
     let hello = "hello\n" as *u8;
     let tab = "a\tb\n" as *u8;
     let quote = "q\"q\n" as *u8;
+    let bslash = "b\\b\n" as *u8;
     printf(f, 1);
     printf(f, 2);
     printf(hello, 0);
     printf(tab, 0);
     printf(quote, 0);
+    printf(bslash, 0);
     return 0;
 }
